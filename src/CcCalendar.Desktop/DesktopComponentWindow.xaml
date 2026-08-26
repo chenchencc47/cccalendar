@@ -1,0 +1,234 @@
+<Window x:Class="CcCalendar.Desktop.DesktopComponentWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:desktop="clr-namespace:CcCalendar.Desktop.Desktop"
+        xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+        xmlns:vm="clr-namespace:CcCalendar.Desktop.ViewModels"
+        AllowsTransparency="True"
+        Background="Transparent"
+        MinWidth="220"
+        MinHeight="160"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="False"
+        WindowStyle="None">
+    <Border x:Name="ChromeBorder"
+            Padding="{DynamicResource DesktopContentPadding}"
+            Background="{DynamicResource DesktopSurfaceBrush}"
+            BorderBrush="{DynamicResource DesktopSeparatorBrush}"
+            BorderThickness="1"
+            CornerRadius="6">
+        <Grid>
+            <Grid x:Name="CalendarContent">
+                <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding Kind}" Value="{x:Static desktop:DesktopComponentKind.Calendar}"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></Grid.Style>
+                <Grid.RowDefinitions><RowDefinition Height="32" /><RowDefinition Height="26" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                <DockPanel Background="Transparent"
+                           Cursor="SizeAll"
+                           MouseLeftButtonDown="WindowHeaderMouseLeftButtonDown">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <ToggleButton Content="月"
+                                      IsChecked="{Binding Workbench.Calendar.Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static vm:CalendarViewMode.Month}}"
+                                      Style="{StaticResource SegmentToggleStyle}" />
+                        <ToggleButton Margin="4,0,0,0"
+                                      Content="周"
+                                      IsChecked="{Binding Workbench.Calendar.Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static vm:CalendarViewMode.Week}}"
+                                      Style="{StaticResource SegmentToggleStyle}" />
+                    </StackPanel>
+                    <TextBlock VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Text="{Binding Workbench.Calendar.DisplayTitle}" />
+                </DockPanel>
+                <UniformGrid Grid.Row="1" Columns="7"><TextBlock HorizontalAlignment="Center" Text="一" /><TextBlock HorizontalAlignment="Center" Text="二" /><TextBlock HorizontalAlignment="Center" Text="三" /><TextBlock HorizontalAlignment="Center" Text="四" /><TextBlock HorizontalAlignment="Center" Text="五" /><TextBlock HorizontalAlignment="Center" Text="六" /><TextBlock HorizontalAlignment="Center" Text="日" /></UniformGrid>
+                <ItemsControl Grid.Row="2" ItemsSource="{Binding Workbench.Calendar.VisibleDays}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="7">
+                                <UniformGrid.Style>
+                                    <Style TargetType="UniformGrid">
+                                        <Setter Property="Rows" Value="6" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Workbench.Calendar.Mode, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                         Value="{x:Static vm:CalendarViewMode.Week}">
+                                                <Setter Property="Rows" Value="1" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </UniformGrid.Style>
+                            </UniformGrid>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="DayCell" Background="Transparent" BorderBrush="{DynamicResource DesktopSeparatorBrush}" BorderThickness="0,1,1,0" MouseLeftButtonDown="CalendarDayMouseLeftButtonDown">
+                                <Grid Margin="6">
+                                    <TextBlock x:Name="DateText" Foreground="{DynamicResource DesktopDateTextBrush}" Text="{Binding Date.Day}" />
+                                    <TextBlock x:Name="DayBadge" HorizontalAlignment="Right" FontSize="10" FontWeight="SemiBold" Text="{Binding DayBadgeText}" />
+                                    <TextBlock x:Name="SecondaryDateText" Margin="0,20,0,0" FontSize="10" Foreground="{DynamicResource DesktopLunarTextBrush}" Text="{Binding SecondaryText}" TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Margin="0,34,0,0" ClipToBounds="True">
+                                        <ItemsControl ItemsSource="{Binding Events}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Height="16"
+                                                            Padding="3,0"
+                                                            HorizontalContentAlignment="Stretch"
+                                                            Background="{DynamicResource DesktopSeparatorBrush}"
+                                                            BorderThickness="0"
+                                                            Click="EventDetailsClick"
+                                                            Tag="{Binding DataContext.Date, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            ToolTip="{Binding Title}">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="3" /><ColumnDefinition Width="34" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                            <Border Background="{DynamicResource DesktopHolidayTextBrush}" />
+                                                            <TextBlock Grid.Column="1" Margin="3,0,0,0" FontSize="9" Foreground="{DynamicResource DesktopSecondaryTextBrush}" Text="{Binding TimeText}" />
+                                                            <TextBlock Grid.Column="2" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource DesktopPrimaryTextBrush}" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                                        </Grid>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Button Height="16"
+                                                Padding="3,0"
+                                                HorizontalContentAlignment="Left"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Click="EventDetailsClick"
+                                                Foreground="{DynamicResource DesktopHolidayTextBrush}"
+                                                FontSize="9"
+                                                Tag="{Binding Date}"
+                                                Content="{Binding RemainingEventCount, StringFormat=还有 {0} 项}">
+                                            <Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Style.Triggers><DataTrigger Binding="{Binding RemainingEventCount}" Value="0"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Button.Style>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsWeekend}" Value="True">
+                                    <Setter TargetName="DateText" Property="Foreground" Value="{DynamicResource DesktopWeekendTextBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsCurrentMonth}" Value="False">
+                                    <Setter TargetName="DayCell" Property="Opacity" Value="{DynamicResource DesktopOtherMonthOpacity}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasSolarTerm}" Value="True">
+                                    <Setter TargetName="SecondaryDateText" Property="Foreground" Value="{DynamicResource DesktopHolidayTextBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasFestival}" Value="True">
+                                    <Setter TargetName="SecondaryDateText" Property="Foreground" Value="{DynamicResource DesktopHolidayTextBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsPublicHoliday}" Value="True">
+                                    <Setter TargetName="DayCell" Property="Background" Value="{DynamicResource DesktopDayOffBackgroundBrush}" />
+                                    <Setter TargetName="DayBadge" Property="Foreground" Value="{DynamicResource DesktopDayOffTextBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsAdjustedWorkday}" Value="True">
+                                    <Setter TargetName="DayCell" Property="Background" Value="{DynamicResource DesktopWorkdayBackgroundBrush}" />
+                                    <Setter TargetName="DayBadge" Property="Foreground" Value="{DynamicResource DesktopWorkdayTextBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                    <Setter TargetName="DayCell" Property="Background" Value="{DynamicResource DesktopTodayBackgroundBrush}" />
+                                    <Setter TargetName="DateText" Property="Foreground" Value="{DynamicResource DesktopTodayTextBrush}" />
+                                    <Setter TargetName="SecondaryDateText" Property="Foreground" Value="{DynamicResource DesktopTodayTextBrush}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+            <Grid>
+                <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding Kind}" Value="{x:Static desktop:DesktopComponentKind.Agenda}"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></Grid.Style>
+                <Grid.RowDefinitions><RowDefinition Height="32" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                <Border Background="Transparent"
+                        Cursor="SizeAll"
+                        MouseLeftButtonDown="WindowHeaderMouseLeftButtonDown">
+                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="日程" />
+                </Border>
+                <ListBox Grid.Row="1"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Foreground="{DynamicResource DesktopPrimaryTextBrush}"
+                         ItemsSource="{Binding Workbench.SelectedEventRows}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="0" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="4,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="30" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock FontSize="11"
+                                               Foreground="{DynamicResource DesktopSecondaryTextBrush}"
+                                               Text="{Binding TimeText}" />
+                                    <TextBlock Margin="0,2,0,0"
+                                               Foreground="{DynamicResource DesktopPrimaryTextBrush}"
+                                               Text="{Binding Title}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Width="28"
+                                        Height="28"
+                                        Padding="0"
+                                        AutomationProperties.Name="删除日程"
+                                        Click="DeleteAgendaEventClick"
+                                        Tag="{Binding Id}"
+                                        ToolTip="删除日程">
+                                    <iconPacks:PackIconLucide Width="14" Height="14" Kind="Trash2" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+            <Grid>
+                <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed" /><Style.Triggers><DataTrigger Binding="{Binding Kind}" Value="{x:Static desktop:DesktopComponentKind.Todo}"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers></Style></Grid.Style>
+                <Grid.RowDefinitions><RowDefinition Height="32" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                <Border Background="Transparent"
+                        Cursor="SizeAll"
+                        MouseLeftButtonDown="WindowHeaderMouseLeftButtonDown">
+                    <TextBlock FontSize="16" FontWeight="SemiBold" Text="待办" />
+                </Border>
+                <ListBox Grid.Row="1"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Foreground="{DynamicResource DesktopPrimaryTextBrush}"
+                         ItemsSource="{Binding Workbench.SelectedTodos}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Padding" Value="0" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="4,5">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <CheckBox Width="18"
+                                          Height="18"
+                                          VerticalAlignment="Top"
+                                          AutomationProperties.Name="完成待办"
+                                          Click="CompleteTodoClick"
+                                          Tag="{Binding Id}" />
+                                <TextBlock Grid.Column="1"
+                                           Margin="8,0,0,0"
+                                           Foreground="{DynamicResource DesktopPrimaryTextBrush}"
+                                           Text="{Binding Title}"
+                                           TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+            <Grid Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Bottom" Panel.ZIndex="20" ToolTip="拖动调整宽高">
+                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource DesktopSecondaryTextBrush}" IsHitTestVisible="False" Text="◢" />
+                <ResizeGrip AutomationProperties.Name="拖动调整宽高" Background="Transparent" Cursor="SizeNWSE" />
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

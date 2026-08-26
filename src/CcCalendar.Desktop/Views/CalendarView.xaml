@@ -1,0 +1,609 @@
+<UserControl x:Class="CcCalendar.Desktop.Views.CalendarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:CcCalendar.Desktop.ViewModels"
+             d:DesignHeight="680"
+             d:DesignWidth="960"
+             mc:Ignorable="d">
+    <Grid Margin="24,20,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="16" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="32" />
+                <ColumnDefinition Width="32" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock VerticalAlignment="Center"
+                       FontSize="20"
+                       FontWeight="SemiBold"
+                       Text="{Binding DisplayTitle}" />
+            <Button Grid.Column="2"
+                    Width="28"
+                    Height="28"
+                    Padding="0"
+                    Command="{Binding MovePreviousCommand}"
+                    ToolTip="上一段时间">
+                <iconPacks:PackIconLucide Width="16" Height="16" Kind="ChevronLeft" />
+            </Button>
+            <Button Grid.Column="3"
+                    Width="28"
+                    Height="28"
+                    Padding="0"
+                    Command="{Binding MoveNextCommand}"
+                    ToolTip="下一段时间">
+                <iconPacks:PackIconLucide Width="16" Height="16" Kind="ChevronRight" />
+            </Button>
+            <Button Grid.Column="5"
+                    Height="28"
+                    Command="{Binding GoToTodayCommand}"
+                    Content="今天" />
+
+            <StackPanel Grid.Column="7" Orientation="Horizontal">
+                <ToggleButton Content="月"
+                              IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static vm:CalendarViewMode.Month}}"
+                              Style="{StaticResource SegmentToggleStyle}" />
+                <ToggleButton Margin="4,0,0,0"
+                              Content="周"
+                              IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static vm:CalendarViewMode.Week}}"
+                              Style="{StaticResource SegmentToggleStyle}" />
+                <ToggleButton Margin="4,0,0,0"
+                              Content="日程表"
+                              IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static vm:CalendarViewMode.Agenda}}"
+                              Style="{StaticResource SegmentToggleStyle}" />
+                <ToggleButton Margin="4,0,0,0"
+                              Content="会议室"
+                              IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static vm:CalendarViewMode.Room}}"
+                              Style="{StaticResource SegmentToggleStyle}" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="280" />
+            </Grid.ColumnDefinitions>
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Mode}" Value="{x:Static vm:CalendarViewMode.Month}">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="32" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <UniformGrid Columns="7" Rows="1">
+                    <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="一" />
+                    <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="二" />
+                    <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="三" />
+                    <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="四" />
+                    <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="五" />
+                    <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="六" />
+                    <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="日" />
+                </UniformGrid>
+                <ItemsControl Grid.Row="1" ItemsSource="{Binding VisibleDays}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="7" Rows="6" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="DayCell"
+                                    Padding="0"
+                                    AutomationProperties.Name="{Binding Date, StringFormat={}{0:yyyy-MM-dd}，双击新增日程}"
+                                    Background="Transparent"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="0,1,1,0"
+                                    MinHeight="72"
+                                    Cursor="Hand"
+                                    MouseLeftButtonDown="DayMouseLeftButtonDown">
+                                <Grid Margin="8,7">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="28" />
+                                        <RowDefinition Height="18" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <Border x:Name="DateMarker"
+                                            Width="26"
+                                            Height="26"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Background="Transparent"
+                                            CornerRadius="13">
+                                        <TextBlock x:Name="DateText"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding Date.Day}" />
+                                    </Border>
+                                    <TextBlock x:Name="DayBadge"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Text="{Binding DayBadgeText}" />
+                                    <TextBlock x:Name="SecondaryDateText"
+                                               Grid.Row="1"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Text="{Binding SecondaryText}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Grid.Row="2" ClipToBounds="True">
+                                        <ItemsControl ItemsSource="{Binding Events}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Height="18"
+                                                            Padding="4,0"
+                                                            HorizontalContentAlignment="Stretch"
+                                                            Background="{DynamicResource AccentSubtleBrush}"
+                                                            BorderThickness="0"
+                                                            Click="EventDetailsClick"
+                                                            Tag="{Binding DataContext.Date, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                            ToolTip="{Binding Title}">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="3" /><ColumnDefinition Width="38" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                            <Border Background="{DynamicResource AccentBrush}" />
+                                                            <TextBlock Grid.Column="1" Margin="4,0,0,0" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding TimeText}" />
+                                                            <TextBlock Grid.Column="2" FontSize="10" FontWeight="SemiBold" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                                        </Grid>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <Button Height="18"
+                                                Padding="4,0"
+                                                HorizontalContentAlignment="Left"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Click="EventDetailsClick"
+                                                FontSize="10"
+                                                Foreground="{DynamicResource AccentBrush}"
+                                                Tag="{Binding Date}"
+                                                Content="{Binding RemainingEventCount, StringFormat=还有 {0} 项}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding RemainingEventCount}" Value="0">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsCurrentMonth}" Value="False">
+                                    <Setter TargetName="DayCell" Property="Opacity" Value="0.45" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsWeekend}" Value="True">
+                                    <Setter TargetName="DateText" Property="Foreground" Value="{DynamicResource DangerBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasSolarTerm}" Value="True">
+                                    <Setter TargetName="SecondaryDateText" Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasFestival}" Value="True">
+                                    <Setter TargetName="SecondaryDateText" Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsPublicHoliday}" Value="True">
+                                    <Setter TargetName="DayBadge" Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsAdjustedWorkday}" Value="True">
+                                    <Setter TargetName="DayBadge" Property="Foreground" Value="{DynamicResource DangerBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                    <Setter TargetName="DateMarker" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="DateText" Property="Foreground" Value="White" />
+                                    <Setter TargetName="DateText" Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter TargetName="DayCell" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Mode}" Value="{x:Static vm:CalendarViewMode.Week}">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <ItemsControl ItemsSource="{Binding VisibleDays}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="7" Rows="1" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="WeekDayCell"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="0,1,1,0"
+                                    Cursor="Hand"
+                                    MouseLeftButtonDown="DayMouseLeftButtonDown">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="82" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Text="{Binding Date, StringFormat={}{0:ddd}}" />
+                                        <Border x:Name="WeekDateMarker"
+                                                Width="26"
+                                                Height="26"
+                                                Margin="0,3,0,0"
+                                                HorizontalAlignment="Center"
+                                                Background="Transparent"
+                                                CornerRadius="13">
+                                            <TextBlock x:Name="WeekDateText"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="16"
+                                                       FontWeight="SemiBold"
+                                                       Text="{Binding Date.Day}" />
+                                        </Border>
+                                        <TextBlock HorizontalAlignment="Center"
+                                                   Margin="0,3,0,0"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Text="{Binding SecondaryText}" />
+                                    </StackPanel>
+                                    <Border Grid.Row="1"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="0,1,0,0">
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                      HorizontalScrollBarVisibility="Disabled">
+                                            <ItemsControl ItemsSource="{Binding Events}" Margin="2,4,2,4">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Height="18"
+                                                                Padding="4,0"
+                                                                HorizontalContentAlignment="Stretch"
+                                                                Background="{DynamicResource AccentSubtleBrush}"
+                                                                BorderThickness="0"
+                                                                Click="EventDetailsClick"
+                                                                Tag="{Binding DataContext.Date, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                ToolTip="{Binding Title}">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="3" />
+                                                                    <ColumnDefinition Width="38" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <Border Background="{DynamicResource AccentBrush}" />
+                                                                <TextBlock Grid.Column="1"
+                                                                           Margin="4,0,0,0"
+                                                                           FontSize="10"
+                                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                           Text="{Binding TimeText}" />
+                                                                <TextBlock Grid.Column="2"
+                                                                           FontSize="10"
+                                                                           FontWeight="SemiBold"
+                                                                           Text="{Binding Title}"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                            </Grid>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsWeekend}" Value="True">
+                                    <Setter TargetName="WeekDateText" Property="Foreground" Value="{DynamicResource DangerBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                    <Setter TargetName="WeekDateMarker" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="WeekDateText" Property="Foreground" Value="White" />
+                                    <Setter TargetName="WeekDateText" Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                    <Setter TargetName="WeekDayCell" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding VisibleDays}">
+                    <ItemsControl.Style>
+                        <Style TargetType="ItemsControl">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Mode}" Value="{x:Static vm:CalendarViewMode.Agenda}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.Style>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid MinHeight="64">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="112" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock FontWeight="SemiBold" Text="{Binding Date, StringFormat={}{0:M月d日}}" />
+                                    <TextBlock Margin="0,3,0,0"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Text="{Binding Date, StringFormat={}{0:dddd}}" />
+                                </StackPanel>
+                                <Border Grid.Column="1" Background="{DynamicResource BorderBrush}" />
+                                <Grid Grid.Column="2" Margin="20,0,0,0">
+                                    <ItemsControl ItemsSource="{Binding Events}" VerticalAlignment="Top">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid MinHeight="40">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="4" />
+                                                        <ColumnDefinition Width="12" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Background="{DynamicResource AccentBrush}" CornerRadius="2" />
+                                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                        <TextBlock FontWeight="SemiBold"
+                                                                   Text="{Binding Title}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Margin="0,3,0,0"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                   Text="{Binding TimeText}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Text="无安排">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Events.Count}" Value="0">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <ScrollViewer>
+                <ScrollViewer.Style>
+                    <Style TargetType="ScrollViewer">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+                        <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Mode}" Value="{x:Static vm:CalendarViewMode.Room}">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ScrollViewer.Style>
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="44" />
+                        <ItemsControl ItemsSource="{Binding RoomColumns}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Width="150"
+                                            Padding="4,6"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="0,0,1,1">
+                                        <StackPanel>
+                                            <TextBlock FontSize="12"
+                                                       FontWeight="SemiBold"
+                                                       Text="{Binding Room}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding Room}" />
+                                            <TextBlock FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Text="{Binding BookingCountText}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <ItemsControl ItemsSource="{Binding HourLabels}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Width="44" Height="52">
+                                        <TextBlock Margin="0,-2,8,0"
+                                                   HorizontalAlignment="Right"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Text="{Binding}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <ItemsControl ItemsSource="{Binding RoomColumns}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Width="150"
+                                            Height="728"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="0,0,1,0">
+                                        <Grid>
+                                            <ItemsControl ItemsSource="{Binding DataContext.RowStripes, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <UniformGrid Columns="1" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Height="26" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <Canvas>
+                                                <ItemsControl ItemsSource="{Binding Bars}">
+                                                    <ItemsControl.ItemContainerStyle>
+                                                        <Style TargetType="ContentPresenter">
+                                                            <Setter Property="Canvas.Left" Value="2" />
+                                                            <Setter Property="Canvas.Top" Value="{Binding Geometry.Top}" />
+                                                        </Style>
+                                                    </ItemsControl.ItemContainerStyle>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Button Width="144"
+                                                                    Height="{Binding Geometry.Height}"
+                                                                    Padding="6,3,0,0"
+                                                                    HorizontalContentAlignment="Stretch"
+                                                                    VerticalContentAlignment="Top"
+                                                                    AutomationProperties.Name="会议室预订"
+                                                                    Background="{DynamicResource AccentSubtleBrush}"
+                                                                    BorderBrush="{DynamicResource AccentBrush}"
+                                                                    BorderThickness="0,0,0,1"
+                                                                    Click="RoomBookingClick"
+                                                                    Tag="{Binding Title}"
+                                                                    ToolTip="{Binding Title}">
+                                                                <TextBlock FontSize="11"
+                                                                           Text="{Binding Title}"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Canvas>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <Border Grid.Column="2"
+                    Padding="16,0,0,0"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitleStyle}"
+                                   Text="{Binding SelectedDateText}" />
+                        <TextBlock Margin="0,4,0,0"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Text="日程" />
+                    </StackPanel>
+                    <Grid Grid.Row="2">
+                        <ItemsControl ItemsSource="{Binding SelectedEventDetails}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid MinHeight="54">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="4" />
+                                            <ColumnDefinition Width="12" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Background="{DynamicResource AccentBrush}"
+                                                CornerRadius="2" />
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <TextBlock FontWeight="SemiBold"
+                                                       Text="{Binding Title}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Margin="0,3,0,0"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Text="{Binding TimeText}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SelectedEventDetails.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <iconPacks:PackIconLucide Width="22"
+                                                    Height="22"
+                                                    HorizontalAlignment="Center"
+                                                    Foreground="{DynamicResource TextSecondaryBrush}"
+                                                    Kind="CalendarClock" />
+                            <TextBlock Margin="0,8,0,0"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Text="当天没有日程" />
+                        </StackPanel>
+                    </Grid>
+                    <Button Grid.Row="4"
+                            HorizontalAlignment="Stretch"
+                            Click="AddSelectedDateClick"
+                            Content="新增日程"
+                            Style="{StaticResource PrimaryButtonStyle}" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

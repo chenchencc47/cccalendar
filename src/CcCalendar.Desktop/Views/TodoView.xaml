@@ -1,0 +1,380 @@
+<UserControl x:Class="CcCalendar.Desktop.Views.TodoView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:core="clr-namespace:CcCalendar.Core.Todos;assembly=CcCalendar.Core"
+             xmlns:views="clr-namespace:CcCalendar.Desktop.Views"
+             xmlns:vm="clr-namespace:CcCalendar.Desktop.ViewModels"
+             PreviewMouseMove="RootPreviewMouseMove"
+             PreviewMouseLeftButtonUp="RootPreviewMouseLeftButtonUp">
+    <UserControl.Resources>
+        <DataTemplate x:Key="TodoCardTemplate">
+            <Border Margin="0,0,0,6"
+                    Padding="10,8"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Cursor="Hand"
+                    MouseLeftButtonUp="TodoCardMouseLeftButtonUp"
+                    PreviewMouseLeftButtonDown="TodoCardPreviewMouseLeftButtonDown"
+                    ToolTip="点击切换完成 / 重新打开；拖动或右键可移动分类">
+                <Border.ContextMenu>
+                    <ContextMenu>
+                        <ContextMenu.Items>
+                            <MenuItem Click="MoveToQuadrantClick" Header="移到：重要且紧急" Tag="{x:Static core:TodoQuadrant.ImportantUrgent}" />
+                            <MenuItem Click="MoveToQuadrantClick" Header="移到：重要不紧急" Tag="{x:Static core:TodoQuadrant.ImportantNotUrgent}" />
+                            <MenuItem Click="MoveToQuadrantClick" Header="移到：紧急不重要" Tag="{x:Static core:TodoQuadrant.NotImportantUrgent}" />
+                            <MenuItem Click="MoveToQuadrantClick" Header="移到：不重要不紧急" Tag="{x:Static core:TodoQuadrant.NotImportantNotUrgent}" />
+                        </ContextMenu.Items>
+                    </ContextMenu>
+                </Border.ContextMenu>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="3" />
+                        <ColumnDefinition Width="6" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="6" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Important indicator bar -->
+                    <Border CornerRadius="2">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsImportant}" Value="True">
+                                        <Setter Property="Background" Value="{DynamicResource WarningBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                    </Border>
+
+                    <!-- Checkbox indicator -->
+                    <Border Grid.Column="2"
+                            Width="16"
+                            Height="16"
+                            Margin="0,1,0,0"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Background="{DynamicResource ControlSurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="3">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Status}" Value="Completed">
+                                        <Setter Property="Background" Value="{DynamicResource SuccessBrush}" />
+                                        <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock FontSize="10"
+                                   FontWeight="SemiBold"
+                                   Foreground="White"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Text="&#x2713;"
+                                   Visibility="Collapsed">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Status}" Value="Completed">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Border>
+
+                    <!-- Content -->
+                    <StackPanel Grid.Column="4">
+                        <TextBlock Text="{Binding Title}"
+                                   TextTrimming="CharacterEllipsis"
+                                   TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Status}" Value="Completed">
+                                            <Setter Property="TextDecorations" Value="Strikethrough" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <!-- Meta line: due time + subtask progress -->
+                        <StackPanel Margin="0,4,0,0"
+                                    Orientation="Horizontal">
+                            <TextBlock FontSize="11"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Text="{Binding DueAtUtc, StringFormat=截止 {0:MM/dd}}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DueAtUtc}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+
+                            <TextBlock Margin="8,0,0,0"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Text="{Binding ProgressPercent, StringFormat={}{0}%}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Subtasks.Count}" Value="0">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+
+                        <!-- Progress bar -->
+                        <ProgressBar Margin="0,4,0,0"
+                                     Height="4"
+                                     Maximum="100"
+                                     Value="{Binding ProgressPercent, Mode=OneWay}">
+                            <ProgressBar.Style>
+                                <Style TargetType="ProgressBar">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Subtasks.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ProgressBar.Style>
+                        </ProgressBar>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid Margin="24,20,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="16" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="待办" />
+            <TextBox x:Name="NewTodoBox"
+                     Grid.Column="2"
+                     Height="32"
+                     Padding="10,0"
+                     VerticalContentAlignment="Center"
+                     AutomationProperties.Name="新增待办"
+                     KeyDown="NewTodoKeyDown"
+                     ToolTip="输入待办内容，回车即新增" />
+            <StackPanel Grid.Column="4" Orientation="Horizontal">
+                <ToggleButton Content="四象限"
+                              IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static vm:TodoViewMode.Quadrants}}"
+                              Style="{StaticResource SegmentToggleStyle}" />
+                <ToggleButton Margin="4,0,0,0"
+                              Content="看板"
+                              IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static vm:TodoViewMode.Board}}"
+                              Style="{StaticResource SegmentToggleStyle}" />
+                <ToggleButton Margin="4,0,0,0"
+                              Content="列表"
+                              IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static vm:TodoViewMode.List}}"
+                              Style="{StaticResource SegmentToggleStyle}" />
+            </StackPanel>
+            <Button Grid.Column="6"
+                    Click="NewTodoClick"
+                    Style="{StaticResource PrimaryButtonStyle}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Width="16" Height="16" Kind="Plus" />
+                    <TextBlock Margin="7,0,0,0" Foreground="White" Text="新增待办" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="2">
+            <!-- Quadrants view -->
+            <ItemsControl ItemsSource="{Binding Quadrants}">
+                <ItemsControl.Style>
+                    <Style TargetType="ItemsControl">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Mode}" Value="{x:Static vm:TodoViewMode.Quadrants}">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ItemsControl.Style>
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><UniformGrid Rows="2" Columns="2" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,0,10,10"
+                                Padding="12"
+                                AllowDrop="True"
+                                Background="Transparent"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                DragOver="TodoDragOver"
+                                Drop="QuadrantDrop"
+                                GiveFeedback="TodoGiveFeedback">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
+                                <ItemsControl Grid.Row="1"
+                                              Margin="0,10,0,0"
+                                              ItemTemplate="{StaticResource TodoCardTemplate}"
+                                              ItemsSource="{Binding Items}" />
+                                <StackPanel Grid.Row="1"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Items.Count}" Value="0">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <iconPacks:PackIconLucide Width="22"
+                                                            Height="22"
+                                                            HorizontalAlignment="Center"
+                                                            Foreground="{DynamicResource TextSecondaryBrush}"
+                                                            Kind="Inbox" />
+                                    <TextBlock Margin="0,6,0,0"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Text="暂无待办" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Board view -->
+            <ScrollViewer views:HorizontalScroll.EnableWheel="True"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled">
+                <ScrollViewer.Style>
+                    <Style TargetType="ScrollViewer" BasedOn="{StaticResource {x:Type ScrollViewer}}">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Mode}" Value="{x:Static vm:TodoViewMode.Board}">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ScrollViewer.Style>
+                <ItemsControl ItemsSource="{Binding BoardColumns}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Width="200"
+                                    Margin="0,0,12,0"
+                                    Padding="12"
+                                    AllowDrop="True"
+                                    Background="Transparent"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="6"
+                                    DragOver="TodoDragOver"
+                                    Drop="BoardColumnDrop"
+                                    GiveFeedback="TodoGiveFeedback">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
+                                    <Grid Grid.Row="1" Margin="0,10,0,0" MinHeight="60">
+                                        <ItemsControl ItemTemplate="{StaticResource TodoCardTemplate}"
+                                                      ItemsSource="{Binding Items}" />
+                                        <StackPanel HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Items.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
+                                            <iconPacks:PackIconLucide Width="20"
+                                                                    Height="20"
+                                                                    HorizontalAlignment="Center"
+                                                                    Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                    Kind="Inbox" />
+                                            <TextBlock Margin="0,4,0,0"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Text="暂无待办" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- List view -->
+            <DataGrid AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      HeadersVisibility="Column"
+                      IsReadOnly="True"
+                      ItemsSource="{Binding ListItems}">
+                <DataGrid.Style>
+                    <Style TargetType="DataGrid">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Mode}" Value="{x:Static vm:TodoViewMode.List}">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.Style>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Width="*" Header="待办" Binding="{Binding Title}" />
+                    <DataGridTextColumn Width="120" Header="状态" Binding="{Binding Status}" />
+                    <DataGridTextColumn Width="160" Header="截止时间" Binding="{Binding DueAtUtc, StringFormat={}{0:yyyy-MM-dd HH:mm}}" />
+                    <DataGridTextColumn Width="90" Header="进度" Binding="{Binding ProgressPercent, StringFormat={}{0}%}" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,102 @@
+<UserControl x:Class="CcCalendar.Desktop.Views.RecordView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
+    <Grid Margin="24,20,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="16" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <DockPanel>
+            <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="记录" />
+            <Button DockPanel.Dock="Right" HorizontalAlignment="Right" Click="CreateRecordClick" Style="{StaticResource PrimaryButtonStyle}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Width="16" Height="16" Kind="Plus" />
+                    <TextBlock Margin="7,0,0,0" Foreground="White" Text="新增记录" />
+                </StackPanel>
+            </Button>
+        </DockPanel>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="260" />
+                <ColumnDefinition Width="1" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid Margin="0,0,20,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="10" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Margin="0,0,0,4"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="搜索记录" />
+                    <TextBox Height="32"
+                             Padding="10,0"
+                             AutomationProperties.Name="搜索记录"
+                             VerticalContentAlignment="Center"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="搜索记录标题和正文，仅用于筛选，不会新增记录" />
+                </StackPanel>
+                <ListBox Grid.Row="2"
+                         ItemsSource="{Binding VisibleRecords}"
+                         SelectedItem="{Binding SelectedRecord}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Row="1"
+                                           Margin="0,4,0,0"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="11"
+                                           Text="{Binding Versions.Count, StringFormat=版本 {0}}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+            <Border Grid.Column="1" Background="{DynamicResource BorderBrush}" />
+            <Grid Grid.Column="2" Margin="20,0,0,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="12" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <DockPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Width="32" Padding="0" Click="BoldClick" Content="B" FontWeight="Bold" ToolTip="加粗" />
+                        <Button Width="32" Margin="4,0,0,0" Padding="0" Click="ItalicClick" Content="I" FontStyle="Italic" ToolTip="斜体" />
+                        <Button Width="32" Margin="4,0,0,0" Padding="0" Click="BulletClick" ToolTip="项目符号">
+                            <iconPacks:PackIconLucide Width="16" Height="16" Kind="List" />
+                        </Button>
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Right" HorizontalAlignment="Right" Orientation="Horizontal">
+                        <TextBlock x:Name="SaveStatusText"
+                                   Margin="0,0,10,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <Button Click="SaveClick" Content="保存版本" />
+                    </StackPanel>
+                </DockPanel>
+                <TextBox x:Name="EditorBox"
+                         Grid.Row="2"
+                         Padding="14"
+                         AcceptsReturn="True"
+                         AcceptsTab="True"
+                         FontFamily="Cascadia Mono, Microsoft YaHei UI"
+                         FontSize="14"
+                         HorizontalScrollBarVisibility="Auto"
+                         PreviewKeyDown="EditorPreviewKeyDown"
+                         Text="{Binding EditorContent, UpdateSourceTrigger=PropertyChanged}"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto" />
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

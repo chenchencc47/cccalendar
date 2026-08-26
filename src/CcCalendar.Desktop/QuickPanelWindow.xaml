@@ -1,0 +1,91 @@
+<Window x:Class="CcCalendar.Desktop.QuickPanelWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="420"
+        Height="640"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStyle="None">
+    <Border Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6">
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="8" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="16" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="16" />
+                <RowDefinition Height="64" />
+            </Grid.RowDefinitions>
+            <TextBlock FontSize="32" FontWeight="SemiBold" Text="{Binding CurrentTime}" />
+            <TextBlock Grid.Row="2" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding DateText}" />
+            <Button Grid.Row="4"
+                    Padding="0"
+                    HorizontalContentAlignment="Stretch"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Click="OpenMainWindowClick"
+                    ToolTip="打开天气详情">
+                <DockPanel>
+                    <TextBlock FontWeight="SemiBold" Text="{Binding Weather.LocationName}" />
+                    <TextBlock Margin="12,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Weather.CurrentSummary}" />
+                </DockPanel>
+            </Button>
+            <DockPanel Grid.Row="6" LastChildFill="False">
+                <TextBlock VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Text="{Binding Calendar.DisplayTitle}" />
+                <Button DockPanel.Dock="Right" Width="52" Height="28" Command="{Binding Calendar.GoToTodayCommand}" Content="今天" />
+            </DockPanel>
+            <Grid Grid.Row="8">
+                <Grid.RowDefinitions><RowDefinition Height="28" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                <UniformGrid Columns="7" Rows="1">
+                    <TextBlock HorizontalAlignment="Center" Text="一" /><TextBlock HorizontalAlignment="Center" Text="二" />
+                    <TextBlock HorizontalAlignment="Center" Text="三" /><TextBlock HorizontalAlignment="Center" Text="四" />
+                    <TextBlock HorizontalAlignment="Center" Text="五" /><TextBlock HorizontalAlignment="Center" Text="六" />
+                    <TextBlock HorizontalAlignment="Center" Text="日" />
+                </UniformGrid>
+                <ItemsControl Grid.Row="1" ItemsSource="{Binding Calendar.VisibleDays}">
+                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7" Rows="6" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="DayMarker" Width="48" Height="50" CornerRadius="4">
+                                <Grid Margin="2">
+                                    <TextBlock x:Name="DayText" HorizontalAlignment="Center" Text="{Binding Date.Day}" />
+                                    <TextBlock x:Name="DayBadge" HorizontalAlignment="Right" FontSize="9" FontWeight="SemiBold" Text="{Binding DayBadgeText}" />
+                                    <TextBlock x:Name="SecondaryDateText" Margin="0,20,0,0" HorizontalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding SecondaryText}" TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsCurrentMonth}" Value="False"><Setter TargetName="DayMarker" Property="Opacity" Value="0.4" /></DataTrigger>
+                                <DataTrigger Binding="{Binding IsWeekend}" Value="True"><Setter TargetName="DayText" Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                <DataTrigger Binding="{Binding HasSolarTerm}" Value="True"><Setter TargetName="SecondaryDateText" Property="Foreground" Value="{DynamicResource AccentBrush}" /></DataTrigger>
+                                <DataTrigger Binding="{Binding HasFestival}" Value="True"><Setter TargetName="SecondaryDateText" Property="Foreground" Value="{DynamicResource AccentBrush}" /></DataTrigger>
+                                <DataTrigger Binding="{Binding IsPublicHoliday}" Value="True"><Setter TargetName="DayBadge" Property="Foreground" Value="{DynamicResource AccentBrush}" /></DataTrigger>
+                                <DataTrigger Binding="{Binding IsAdjustedWorkday}" Value="True"><Setter TargetName="DayBadge" Property="Foreground" Value="{DynamicResource DangerBrush}" /></DataTrigger>
+                                <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                    <Setter TargetName="DayMarker" Property="Background" Value="{DynamicResource AccentBrush}" />
+                                    <Setter TargetName="DayText" Property="Foreground" Value="White" />
+                                    <Setter TargetName="SecondaryDateText" Property="Foreground" Value="White" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+            <UniformGrid Grid.Row="10" Columns="3" Rows="1">
+                <Button Margin="0,0,6,0" Click="OpenMainWindowClick" Content="新增日程" />
+                <Button Margin="3,0" Click="OpenMainWindowClick" Content="新增待办" />
+                <Button Margin="6,0,0,0" Click="OpenMainWindowClick" Content="打开主窗口" />
+            </UniformGrid>
+        </Grid>
+    </Border>
+</Window>

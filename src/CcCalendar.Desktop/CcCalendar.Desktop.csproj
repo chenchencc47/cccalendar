@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CcCalendar.Core\CcCalendar.Core.csproj" />
+    <ProjectReference Include="..\CcCalendar.Infrastructure\CcCalendar.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="MahApps.Metro.IconPacks.Lucide" />
+    <PackageReference Include="MdXaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\cccalendar.ico" />
+    <EmbeddedResource Include="Assets\cccalendar.ico" LogicalName="CcCalendar.Desktop.Assets.cccalendar.ico" />
+    <Resource Include="Assets\material-symbols--download.svg" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>cccalendar</AssemblyName>
+    <ApplicationIcon>Assets\cccalendar.ico</ApplicationIcon>
+    <Product>cccalendar</Product>
+    <Version>0.5.9</Version>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CcCalendar.Desktop.Tests" />
+  </ItemGroup>
+
+</Project>

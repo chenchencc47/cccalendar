@@ -1,0 +1,98 @@
+<UserControl x:Class="CcCalendar.Desktop.Views.StatisticsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="24,20,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="36" />
+            <RowDefinition Height="20" />
+            <RowDefinition Height="90" />
+            <RowDefinition Height="24" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="24" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="统计" />
+        <TextBlock Grid.Row="1"
+                   VerticalAlignment="Center"
+                   FontSize="12"
+                   Foreground="{DynamicResource TextSecondaryBrush}">
+            <Run Text="数据截至 " />
+            <Run Text="{Binding ReportDate, StringFormat={}{0:yyyy年MM月dd日}}" />
+        </TextBlock>
+
+        <UniformGrid Grid.Row="2" Columns="5" Rows="1">
+            <Border Margin="0,0,10,0" Padding="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="项目" /><TextBlock Margin="0,8,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding ProjectCount}" /></StackPanel>
+            </Border>
+            <Border Margin="0,0,10,0" Padding="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="待办" /><TextBlock Margin="0,8,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding TotalTodos}" /></StackPanel>
+            </Border>
+            <Border Margin="0,0,10,0" Padding="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="已完成" /><TextBlock Margin="0,8,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding CompletedTodos}" /></StackPanel>
+            </Border>
+            <Border Margin="0,0,10,0" Padding="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="逾期" /><TextBlock Margin="0,8,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding OverdueTodos}" /></StackPanel>
+            </Border>
+            <Border Padding="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="专注分钟" /><TextBlock Margin="0,8,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding FocusMinutes}" /></StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <Grid Grid.Row="4">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <TextBlock FontSize="16" FontWeight="SemiBold" Text="近 7 天完成趋势" />
+            <Border Grid.Row="1"
+                    Height="1"
+                    Margin="0,0,0,24"
+                    VerticalAlignment="Bottom"
+                    Background="{DynamicResource BorderBrush}" />
+            <ItemsControl Grid.Row="1" Margin="0,18,0,0" ItemsSource="{Binding DailyCompletions}">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7" Rows="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="4,0">
+                            <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="24" /></Grid.RowDefinitions>
+                            <StackPanel VerticalAlignment="Bottom">
+                                <TextBlock Margin="0,0,0,2"
+                                           HorizontalAlignment="Center"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Text="{Binding Count}" />
+                                <Border Width="28"
+                                        Height="{Binding BarHeight}"
+                                        MinHeight="4"
+                                        VerticalAlignment="Bottom"
+                                        Background="{DynamicResource AccentBrush}"
+                                        CornerRadius="4,4,0,0"
+                                        ToolTip="{Binding Count}" />
+                            </StackPanel>
+                            <TextBlock Grid.Row="1"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Bottom"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Text="{Binding Date, StringFormat={}{0:M/d}}" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Grid>
+
+        <Border Grid.Row="6"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Background="{DynamicResource AccentBrush}" CornerRadius="6,0,0,6" />
+                <StackPanel Grid.Column="1" Margin="16">
+                    <TextBlock FontWeight="SemiBold" Text="本周摘要" />
+                    <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding WeeklySummary}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

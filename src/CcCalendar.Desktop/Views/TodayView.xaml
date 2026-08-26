@@ -1,0 +1,307 @@
+<UserControl x:Class="CcCalendar.Desktop.Views.TodayView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:views="clr-namespace:CcCalendar.Desktop.Views">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <Grid Margin="24,20,24,28">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="20" />
+                <RowDefinition Height="300" />
+                <RowDefinition Height="24" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="今天" />
+                <StackPanel Margin="0,5,0,0" Orientation="Horizontal">
+                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding FormattedDate}" />
+                    <TextBlock Margin="12,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding LunarDateText}" />
+                    <TextBlock Margin="12,0,0,0" Foreground="{DynamicResource AccentBrush}" Text="{Binding SpecialDayText}" />
+                </StackPanel>
+            </StackPanel>
+
+            <Grid x:Name="TodayWorkArea" Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*" />
+                    <ColumnDefinition Width="1" />
+                    <ColumnDefinition Width="2*" />
+                </Grid.ColumnDefinitions>
+                <Grid Margin="0,0,24,0">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource SectionTitleStyle}" Text="今日日程" />
+                    <Grid Grid.Row="1">
+                        <ItemsControl ItemsSource="{Binding TodaySchedules}">
+                            <ItemsControl.Style>
+                                <Style TargetType="ItemsControl">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TodaySchedules.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ItemsControl.Style>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="10,8"
+                                            Margin="0,0,0,6"
+                                            Background="{DynamicResource SurfaceBrush}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="12" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Background="{DynamicResource AccentBrush}" CornerRadius="2" />
+                                            <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                                <TextBlock FontWeight="SemiBold"
+                                                           Text="{Binding Title}"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Margin="0,3,0,0"
+                                                           FontSize="12"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Text="{Binding TimeText}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TodaySchedules.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <iconPacks:PackIconLucide Width="28" Height="28" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Kind="CalendarClock" />
+                            <TextBlock Margin="0,10,0,0" Foreground="{DynamicResource TextSecondaryBrush}" Text="今天没有日程" />
+                            <Button Margin="0,12,0,0"
+                                    Click="QuickAddScheduleClick"
+                                    Style="{StaticResource PrimaryButtonStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <iconPacks:PackIconLucide Width="14" Height="14" Kind="Plus" />
+                                    <TextBlock Margin="6,0,0,0" Foreground="White" Text="新增日程" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+                <Border Grid.Column="1" Background="{DynamicResource BorderBrush}" />
+                <Grid Grid.Column="2" Margin="24,0,0,0">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource SectionTitleStyle}" Text="今日待办" />
+                    <Grid Grid.Row="1">
+                        <ItemsControl ItemsSource="{Binding TodayTodos}">
+                            <ItemsControl.Style>
+                                <Style TargetType="ItemsControl">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TodayTodos.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ItemsControl.Style>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Padding="10,8"
+                                            Margin="0,0,0,6"
+                                            Background="{DynamicResource SurfaceBrush}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="3" />
+                                                <ColumnDefinition Width="16" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.Column="0" CornerRadius="2">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="Transparent" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource SuccessBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
+                                            <Border Grid.Column="1"
+                                                    Width="16"
+                                                    Height="16"
+                                                    HorizontalAlignment="Left"
+                                                    VerticalAlignment="Center"
+                                                    BorderBrush="{DynamicResource BorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="3">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="Transparent" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                <Setter Property="Background" Value="{DynamicResource SuccessBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <iconPacks:PackIconLucide Width="12"
+                                                                          Height="12"
+                                                                          HorizontalAlignment="Center"
+                                                                          VerticalAlignment="Center"
+                                                                          Foreground="White"
+                                                                          Kind="Check">
+                                                    <iconPacks:PackIconLucide.Style>
+                                                        <Style TargetType="iconPacks:PackIconLucide">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </iconPacks:PackIconLucide.Style>
+                                                </iconPacks:PackIconLucide>
+                                            </Border>
+                                            <StackPanel Grid.Column="2"
+                                                        Margin="8,0,0,0"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsCompleted}" Value="True">
+                                                                    <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Margin="0,3,0,0"
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Text="{Binding DueText}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TodayTodos.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <iconPacks:PackIconLucide Width="28" Height="28" HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Kind="ListChecks" />
+                            <TextBlock Margin="0,10,0,0" Foreground="{DynamicResource TextSecondaryBrush}" Text="今天没有待办" />
+                            <Button Margin="0,12,0,0"
+                                    Click="QuickAddTodoClick"
+                                    Style="{StaticResource PrimaryButtonStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <iconPacks:PackIconLucide Width="14" Height="14" Kind="Plus" />
+                                    <TextBlock Margin="6,0,0,0" Foreground="White" Text="新增待办" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <Border x:Name="WeatherDetails"
+                    Grid.Row="4"
+                    Padding="0,20,0,0"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="0,1,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="16" />
+                        <RowDefinition Height="94" />
+                        <RowDefinition Height="18" />
+                        <RowDefinition Height="68" />
+                    </Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="{Binding Weather.LocationName}" />
+                                <Button Margin="8,-5,0,0" AutomationProperties.Name="刷新天气" Command="{Binding Weather.RefreshCommand}" Style="{StaticResource IconButtonStyle}" ToolTip="刷新天气">
+                                    <iconPacks:PackIconLucide Width="15" Height="15" Kind="RefreshCw" />
+                                </Button>
+                            </StackPanel>
+                            <TextBlock Margin="0,4,0,0" FontSize="20" FontWeight="SemiBold" Text="{Binding Weather.CurrentSummary}" />
+                            <TextBlock Margin="0,3,0,0" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Weather.CurrentDetails}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                            <WrapPanel HorizontalAlignment="Right">
+                                <CheckBox Margin="0,0,12,0" VerticalAlignment="Center" Content="自动定位" IsChecked="{Binding Weather.IsAutomaticLocation}" />
+                                <TextBox Width="120" AutomationProperties.Name="城市搜索" KeyDown="SearchQueryKeyDown" Text="{Binding Weather.SearchQuery, UpdateSourceTrigger=PropertyChanged}" ToolTip="输入城市名" />
+                                <Button Margin="5,0,0,0" AutomationProperties.Name="搜索城市" Command="{Binding Weather.SearchCommand}" Style="{StaticResource IconButtonStyle}" ToolTip="搜索城市">
+                                    <iconPacks:PackIconLucide Width="15" Height="15" Kind="Search" />
+                                </Button>
+                                <ComboBox Width="170" Margin="8,0,0,0" DisplayMemberPath="DisplayName" IsDropDownOpen="{Binding Weather.IsSearchResultsOpen, Mode=TwoWay}" ItemsSource="{Binding Weather.SearchResults}" SelectedItem="{Binding Weather.SelectedSearchResult}" ToolTip="选择城市" />
+                                <Button Margin="5,0,0,0" AutomationProperties.Name="使用所选城市" Command="{Binding Weather.SelectManualLocationCommand}" Style="{StaticResource IconButtonStyle}" ToolTip="使用所选城市">
+                                    <iconPacks:PackIconLucide Width="15" Height="15" Kind="Check" />
+                                </Button>
+                            </WrapPanel>
+                            <TextBlock Margin="0,6,0,0" HorizontalAlignment="Right" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Weather.StatusMessage}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="2"
+                                  views:HorizontalScroll.EnableDragPan="True"
+                                  views:HorizontalScroll.EnableWheel="True"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  ToolTip="按住内容可左右拖动"
+                                  VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding Weather.Hourly}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Width="76" Background="Transparent">
+                                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding TimeLabel}" />
+                                        <TextBlock Margin="0,3,0,0" FontWeight="SemiBold" Text="{Binding Temperature}" />
+                                        <TextBlock Margin="0,2,0,0" FontSize="11" Text="{Binding Condition}" />
+                                        <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Precipitation}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <ItemsControl Grid.Row="4" ItemsSource="{Binding Weather.Daily}">
+                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="7" Rows="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Date, StringFormat={}{0:M月d日}}" />
+                                    <TextBlock Margin="0,3,0,0" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Condition}" />
+                                    <TextBlock Margin="0,3,0,0" FontWeight="SemiBold" Text="{Binding TemperatureRange}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+            </Border>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

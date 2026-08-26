@@ -1,0 +1,41 @@
+# Build outputs
+bin/
+obj/
+artifacts/
+publish/
+
+# IDE and user state
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test outputs
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*_pid.txt
+
+# Packages and generated files
+packages/
+*.nupkg
+*.snupkg
+
+# Runtime data and secrets
+data/
+logs/
+backups/
+attachments/
+*.db
+*.db-shm
+*.db-wal
+*.local.json
+secrets.json
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store

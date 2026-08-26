@@ -1,0 +1,22 @@
+<Window x:Class="CcCalendar.Desktop.RegionSelectorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        AllowsTransparency="True"
+        Background="#33000000"
+        Cursor="Cross"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStyle="None"
+        KeyDown="WindowKeyDown"
+        MouseDown="WindowMouseDown"
+        MouseMove="WindowMouseMove"
+        MouseUp="WindowMouseUp">
+    <Canvas x:Name="SelectionCanvas">
+        <Border x:Name="SelectionBorder"
+                Background="#11FFFFFF"
+                BorderBrush="White"
+                BorderThickness="2"
+                Visibility="Collapsed" />
+    </Canvas>
+</Window>

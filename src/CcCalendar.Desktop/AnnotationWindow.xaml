@@ -1,0 +1,57 @@
+<Window x:Class="CcCalendar.Desktop.AnnotationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="截图标注"
+        Width="1000"
+        Height="720"
+        MinWidth="720"
+        MinHeight="520"
+        Background="{DynamicResource PageBackgroundBrush}"
+        WindowStartupLocation="CenterOwner">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="52" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="44" />
+        </Grid.RowDefinitions>
+        <StackPanel Margin="16,0" VerticalAlignment="Center" Orientation="Horizontal">
+            <Button MinWidth="72" Click="PenClick" Content="画笔" />
+            <Button MinWidth="72" Margin="8,0,0,0" Click="EraseClick" Content="橡皮" />
+            <Button MinWidth="72" Margin="8,0,0,0" Click="ClearClick" Content="清除" />
+            <Button MinWidth="72" Margin="8,0,0,0" Click="MosaicClick" Content="马赛克" />
+            <Button MinWidth="72" Margin="8,0,0,0" Click="OcrClick" Content="OCR" />
+            <Button MinWidth="72" Margin="8,0,0,0" Click="PinClick" Content="贴屏" />
+            <Button MinWidth="72" Margin="24,0,0,0" Click="CopyClick" Content="复制" />
+            <Button MinWidth="72" Margin="8,0,0,0" Click="SaveClick" Content="保存" Style="{StaticResource PrimaryButtonStyle}" />
+        </StackPanel>
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <Border HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Border.LayoutTransform>
+                    <ScaleTransform x:Name="AnnotationZoomTransform" ScaleX="1" ScaleY="1" />
+                </Border.LayoutTransform>
+                <Grid x:Name="AnnotationSurface" Background="White">
+                    <Image x:Name="ScreenshotImage" Stretch="None" />
+                    <InkCanvas x:Name="Ink"
+                               Background="Transparent"
+                               PreviewMouseDown="InkPreviewMouseDown"
+                               PreviewMouseUp="InkPreviewMouseUp" />
+                </Grid>
+            </Border>
+        </ScrollViewer>
+        <StackPanel Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal">
+            <Button Width="30" Height="28" Padding="0" Click="ZoomOutClick" Content="−" ToolTip="缩小" />
+            <Slider x:Name="ZoomSlider"
+                    Width="180"
+                    Margin="10,0"
+                    AutomationProperties.Name="截图缩放"
+                    IsSnapToTickEnabled="True"
+                    Maximum="400"
+                    Minimum="25"
+                    TickFrequency="25"
+                    Value="100"
+                    ValueChanged="ZoomSliderChanged" />
+            <TextBlock x:Name="ZoomText" Width="48" VerticalAlignment="Center" Text="100%" />
+            <Button Width="30" Height="28" Padding="0" Click="ZoomInClick" Content="+" ToolTip="放大" />
+        </StackPanel>
+    </Grid>
+</Window>

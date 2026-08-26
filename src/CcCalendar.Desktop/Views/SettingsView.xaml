@@ -1,0 +1,619 @@
+<UserControl x:Class="CcCalendar.Desktop.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:core="clr-namespace:CcCalendar.Core.Configuration;assembly=CcCalendar.Core"
+             xmlns:desktop="clr-namespace:CcCalendar.Desktop.Desktop"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DesignHeight="680"
+             d:DesignWidth="900"
+             mc:Ignorable="d">
+    <UserControl.Resources>
+        <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,24,0,8" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="SettingRowStyle" TargetType="Grid">
+            <Setter Property="MinHeight" Value="48" />
+        </Style>
+        <Style TargetType="TabItem">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Padding" Value="14,0" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="HeaderBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="0,0,0,2">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              ContentSource="Header" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="HeaderBorder" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="HeaderBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <TabControl Background="Transparent" BorderThickness="0">
+        <TabItem Header="桌面外观">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Grid Margin="24,20,32,32" MaxWidth="920" HorizontalAlignment="Left">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <DockPanel>
+                <Button DockPanel.Dock="Right"
+                        Command="{Binding RestoreDefaultsCommand}"
+                        Content="恢复当前默认" />
+                <StackPanel>
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="桌面外观" />
+                </StackPanel>
+            </DockPanel>
+
+            <StackPanel Grid.Row="1" Margin="0,20,0,0" Orientation="Horizontal">
+                <ToggleButton Content="日历"
+                              IsChecked="{Binding SelectedTarget, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static desktop:DesktopAppearanceTarget.Workbench}}"
+                              Style="{StaticResource SegmentToggleStyle}" />
+                <ToggleButton Margin="4,0,0,0"
+                              Content="日程"
+                              IsChecked="{Binding SelectedTarget, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static desktop:DesktopAppearanceTarget.Agenda}}"
+                              Style="{StaticResource SegmentToggleStyle}" />
+                <ToggleButton Margin="4,0,0,0"
+                              Content="待办"
+                              IsChecked="{Binding SelectedTarget, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static desktop:DesktopAppearanceTarget.Todo}}"
+                              Style="{StaticResource SegmentToggleStyle}" />
+            </StackPanel>
+
+            <StackPanel Grid.Row="2">
+                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="背景与主题" />
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                    <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="主题" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal">
+                            <ToggleButton Content="跟随系统" IsChecked="{Binding Theme, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:ThemePreference.System}}" Style="{StaticResource SegmentToggleStyle}" />
+                            <ToggleButton Margin="4,0,0,0" Content="浅色" IsChecked="{Binding Theme, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:ThemePreference.Light}}" Style="{StaticResource SegmentToggleStyle}" />
+                            <ToggleButton Margin="4,0,0,0" Content="深色" IsChecked="{Binding Theme, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:ThemePreference.Dark}}" Style="{StaticResource SegmentToggleStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                    <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="背景材质" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal">
+                            <ToggleButton Content="纯色" IsChecked="{Binding Material, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:DesktopBackgroundMaterial.Solid}}" Style="{StaticResource SegmentToggleStyle}" />
+                            <ToggleButton Margin="4,0,0,0" Content="云母" IsChecked="{Binding Material, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:DesktopBackgroundMaterial.Mica}}" Style="{StaticResource SegmentToggleStyle}" />
+                            <ToggleButton Margin="4,0,0,0" Content="亚克力" IsChecked="{Binding Material, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:DesktopBackgroundMaterial.Acrylic}}" Style="{StaticResource SegmentToggleStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                    <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="*" /><ColumnDefinition Width="54" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="背景不透明度" />
+                        <Slider Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="1" Value="{Binding OpacityPercent, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding OpacityPercent, StringFormat={}{0:F0}%}" />
+                    </Grid>
+                </Border>
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,1">
+                    <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="*" /><ColumnDefinition Width="54" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="窗口圆角" />
+                        <Slider Grid.Column="1" Minimum="0" Maximum="24" TickFrequency="1" Value="{Binding CornerRadius, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding CornerRadius, StringFormat={}{0:F0} px}" />
+                    </Grid>
+                </Border>
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                    <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="启动方式" />
+                        <CheckBox Grid.Column="1"
+                                  VerticalAlignment="Center"
+                                  IsChecked="{Binding StartWithMainWindowHidden}"
+                                  Content="启动时隐藏主窗口，仅显示桌面组件与托盘" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <StackPanel Grid.Row="3">
+                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="文字与密度" />
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                    <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="*" /><ColumnDefinition Width="54" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="界面缩放" />
+                        <Slider Grid.Column="1" Minimum="80" Maximum="140" TickFrequency="5" Value="{Binding ScalePercent, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding ScalePercent, StringFormat={}{0:F0}%}" />
+                    </Grid>
+                </Border>
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                    <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="*" /><ColumnDefinition Width="130" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="界面字体" />
+                        <ComboBox Grid.Column="1" Width="280" HorizontalAlignment="Left" IsEditable="True" ItemsSource="{Binding FontFamilies}" Text="{Binding FontFamily, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                        <CheckBox Grid.Column="2" VerticalAlignment="Center" IsChecked="{Binding IsTextBold}" Content="文字加粗" />
+                    </Grid>
+                </Border>
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                    <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="*" /><ColumnDefinition Width="54" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="文字大小" />
+                        <Slider Grid.Column="1" Minimum="11" Maximum="20" TickFrequency="1" Value="{Binding FontSize, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Text="{Binding FontSize, StringFormat={}{0:F0} px}" />
+                    </Grid>
+                </Border>
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,1">
+                    <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="内容密度" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal">
+                            <ToggleButton Content="紧凑" IsChecked="{Binding Density, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:DesktopDensity.Compact}}" Style="{StaticResource SegmentToggleStyle}" />
+                            <ToggleButton Margin="4,0,0,0" Content="标准" IsChecked="{Binding Density, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:DesktopDensity.Comfortable}}" Style="{StaticResource SegmentToggleStyle}" />
+                            <ToggleButton Margin="4,0,0,0" Content="宽松" IsChecked="{Binding Density, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:DesktopDensity.Spacious}}" Style="{StaticResource SegmentToggleStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <StackPanel Grid.Row="4">
+                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="日历内容" />
+                <UniformGrid Columns="2">
+                    <CheckBox Margin="0,8,24,8" IsChecked="{Binding ShowDateEvents}" Content="显示日期日程" />
+                    <CheckBox Margin="0,8,24,8" IsChecked="{Binding ShowDetailedEvents}" Content="显示详细日程" />
+                    <CheckBox Margin="0,8,24,8" IsChecked="{Binding ShowDateSeparators}" Content="显示日期分割线" />
+                    <CheckBox Margin="0,8,24,8" IsChecked="{Binding HighlightCurrentMonth}" Content="突出本月日期" />
+                    <CheckBox Margin="0,8,24,8" IsChecked="{Binding ShowTextOutline}" Content="显示文字描边" />
+                </UniformGrid>
+            </StackPanel>
+
+            <StackPanel Grid.Row="5">
+                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="颜色" />
+                <ItemsControl ItemsSource="{Binding ColorOptions}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Width="320" Height="42" Margin="0,0,24,0">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="88" /><ColumnDefinition Width="32" /></Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Text="{Binding Label}" />
+                                <TextBox Grid.Column="1" Height="28" VerticalContentAlignment="Center" Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                                <Button x:Name="ColorButton"
+                                        Grid.Column="2"
+                                        Width="28"
+                                        Height="28"
+                                        Padding="2"
+                                        HorizontalAlignment="Right"
+                                        AutomationProperties.Name="选择颜色"
+                                        Command="{Binding TogglePaletteCommand}"
+                                        ToolTip="点击选择颜色">
+                                    <Border Width="20"
+                                            Height="20"
+                                            Background="{Binding Value, Converter={StaticResource ColorStringToBrushConverter}}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="3" />
+                                </Button>
+                                <Popup Grid.Column="2"
+                                       AllowsTransparency="True"
+                                       DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                       IsOpen="{Binding IsPaletteOpen, Mode=TwoWay}"
+                                       Placement="Bottom"
+                                       PlacementTarget="{Binding ElementName=ColorButton}"
+                                       StaysOpen="False">
+                                    <Border Margin="0,4,0,0"
+                                            Padding="12"
+                                            Background="{DynamicResource SurfaceBrush}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="6">
+                                        <StackPanel Width="390">
+                                            <TextBlock FontWeight="SemiBold" Text="选择颜色" />
+                                            <Border Height="32"
+                                                    Margin="0,8,0,4"
+                                                    Background="{Binding Value, Converter={StaticResource ColorStringToBrushConverter}}"
+                                                    BorderBrush="{DynamicResource BorderBrush}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="4" />
+                                            <ItemsControl Margin="0,8,0,8" ItemsSource="{Binding PaletteOptions}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><UniformGrid Columns="12" /></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Width="27"
+                                                                Height="27"
+                                                                Margin="1"
+                                                                Background="{Binding Color, Converter={StaticResource ColorStringToBrushConverter}}"
+                                                                BorderBrush="{DynamicResource BorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="3">
+                                                            <Button Width="25"
+                                                                    Height="25"
+                                                                    Padding="0"
+                                                                    Background="Transparent"
+                                                                    BorderThickness="0"
+                                                                    Command="{Binding SelectCommand}"
+                                                                    ToolTip="{Binding Color}" />
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <Grid Margin="0,10,0,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="112" /></Grid.ColumnDefinitions>
+                                                <TextBox Height="28"
+                                                         Margin="0,0,6,0"
+                                                         VerticalContentAlignment="Center"
+                                                         Text="{Binding CustomValue, UpdateSourceTrigger=PropertyChanged}" />
+                                                <Button Grid.Column="1"
+                                                        Height="28"
+                                                        Click="CustomColorClick"
+                                                        Content="更多颜色..." />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Margin="0,4,0,0" Foreground="{DynamicResource DangerBrush}" Text="{Binding ColorValidationMessage}" />
+            </StackPanel>
+            <StackPanel Grid.Row="6">
+                <TextBlock Style="{StaticResource SectionTitleStyle}" Text="应用更新" />
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                    <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="检查新版本" />
+                        <Button Grid.Column="1"
+                                Padding="12,5"
+                                Click="CheckForUpdatesClick"
+                                Content="检查更新"
+                                ToolTip="立即检查是否有新的安装包" />
+                        <TextBlock Grid.Column="2"
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Text="启动时也会自动检查" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </TabItem>
+        <TabItem Header="全局快捷键">
+            <Grid Margin="24,20,32,32" MaxWidth="920" HorizontalAlignment="Left" DataContext="{Binding Shortcuts}">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <TextBlock FontSize="20" FontWeight="SemiBold" Text="全局快捷键" />
+                <TextBlock Grid.Row="1"
+                           Margin="0,8,0,0"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Text="桌面组件开启鼠标穿透后无法右键，请使用“关闭全部鼠标穿透”快捷键恢复操作。默认：Ctrl + Alt + Shift + P。"
+                           TextWrapping="Wrap" />
+                <ItemsControl Grid.Row="2" Margin="0,18,0,0" ItemsSource="{Binding Bindings}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                                <Grid MinHeight="58">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220" />
+                                        <ColumnDefinition Width="240" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock VerticalAlignment="Center" Text="{Binding Label}" />
+                                    <TextBox Grid.Column="1"
+                                             Height="32"
+                                             VerticalAlignment="Center"
+                                             VerticalContentAlignment="Center"
+                                             IsReadOnly="True"
+                                             PreviewKeyDown="ShortcutPreviewKeyDown"
+                                             Text="{Binding DisplayText, Mode=OneWay}"
+                                             ToolTip="聚焦后按下新的组合键" />
+                                    <TextBlock Grid.Column="2"
+                                               Margin="16,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource DangerBrush}"
+                                               Text="{Binding StatusMessage}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+        </TabItem>
+        <TabItem Header="提醒">
+            <Grid Margin="24,20,32,32" MaxWidth="920" HorizontalAlignment="Left" DataContext="{Binding ReminderNotifications}">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <TextBlock FontSize="20" FontWeight="SemiBold" Text="提醒" />
+                <StackPanel Grid.Row="1" Margin="0,18,0,0">
+                    <TextBlock Margin="0,0,0,8" FontSize="16" FontWeight="SemiBold" Text="通知方式" />
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid MinHeight="48">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="Windows 通知（弹窗关闭时备用）" />
+                            <CheckBox Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding IsSystemNotificationEnabled}" />
+                        </Grid>
+                    </Border>
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid MinHeight="48">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="应用内弹窗" />
+                            <CheckBox Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding IsPopupEnabled}" />
+                        </Grid>
+                    </Border>
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid MinHeight="48">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="提示音" />
+                            <CheckBox Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding IsSoundEnabled}" />
+                        </Grid>
+                    </Border>
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,1">
+                        <Grid MinHeight="48">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="120" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="默认稍后提醒"
+                                       ToolTip="仅在提醒弹窗中点击“稍后”时生效；会议提前提醒请在具体日程中设置" />
+                            <TextBox Grid.Column="1"
+                                     Width="120"
+                                     HorizontalContentAlignment="Center"
+                                     Text="{Binding DefaultSnoozeMinutes, UpdateSourceTrigger=LostFocus}"
+                                     ToolTip="输入 1 到 1440 分钟" />
+                            <TextBlock Grid.Column="2" Margin="10,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="分钟" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Row="2">
+                    <TextBlock Margin="0,24,0,8" FontSize="16" FontWeight="SemiBold" Text="勿扰" />
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid MinHeight="48">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="定时勿扰" />
+                            <CheckBox Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding IsDoNotDisturbEnabled}" />
+                        </Grid>
+                    </Border>
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid MinHeight="48">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="112" /><ColumnDefinition Width="40" /><ColumnDefinition Width="112" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="勿扰时段" />
+                            <ComboBox Grid.Column="1" ItemStringFormat="{}{0:HH\:mm}" ItemsSource="{Binding TimeOptions}" SelectedItem="{Binding DoNotDisturbStart}" />
+                            <TextBlock Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center" Text="至" />
+                            <ComboBox Grid.Column="3" ItemStringFormat="{}{0:HH\:mm}" ItemsSource="{Binding TimeOptions}" SelectedItem="{Binding DoNotDisturbEnd}" />
+                        </Grid>
+                    </Border>
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,1">
+                        <Grid MinHeight="48">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="全屏时勿扰" />
+                            <CheckBox Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding SuppressWhenFullscreen}" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </TabItem>
+        <TabItem Header="AI 模型">
+            <Grid Margin="24,20,32,32"
+                  MaxWidth="920"
+                  HorizontalAlignment="Left"
+                  DataContext="{Binding Ai}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="18" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="20" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock FontSize="20" FontWeight="SemiBold" Text="AI 模型" />
+                <StackPanel Grid.Row="2">
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid MinHeight="52">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="配置名称" />
+                            <TextBox Grid.Column="1"
+                                     Height="32"
+                                     VerticalContentAlignment="Center"
+                                     Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                    </Border>
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid MinHeight="52">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="提供商" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal">
+                                <ToggleButton Content="OpenAI 兼容"
+                                              IsChecked="{Binding Provider, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:AiProviderKind.OpenAiCompatible}}"
+                                              Style="{StaticResource SegmentToggleStyle}" />
+                                <ToggleButton Margin="4,0,0,0"
+                                              Content="OpenAI Responses"
+                                              IsChecked="{Binding Provider, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:AiProviderKind.OpenAiResponses}}"
+                                              Style="{StaticResource SegmentToggleStyle}" />
+                                <ToggleButton Margin="4,0,0,0"
+                                              Content="Anthropic"
+                                              IsChecked="{Binding Provider, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:AiProviderKind.Anthropic}}"
+                                              Style="{StaticResource SegmentToggleStyle}" />
+                                <ToggleButton Margin="4,0,0,0"
+                                              Content="Ollama"
+                                              IsChecked="{Binding Provider, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static core:AiProviderKind.Ollama}}"
+                                              Style="{StaticResource SegmentToggleStyle}" />
+                                <CheckBox Margin="18,0,0,0"
+                                          VerticalAlignment="Center"
+                                          Content="仅本地模式"
+                                          IsChecked="{Binding LocalOnlyMode}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid MinHeight="52">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="380" /><ColumnDefinition Width="36" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="服务端点" />
+                            <TextBox x:Name="AiEndpointTextBox"
+                                     Grid.Column="1"
+                                     Height="32"
+                                     AutomationProperties.Name="AI 服务端点"
+                                     VerticalContentAlignment="Center"
+                                     Text="{Binding Endpoint, UpdateSourceTrigger=PropertyChanged}">
+                                <TextBox.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Command="ApplicationCommands.Cut" Header="剪切" />
+                                        <MenuItem Command="ApplicationCommands.Copy" Header="复制" />
+                                        <MenuItem Command="ApplicationCommands.Paste" Header="粘贴" />
+                                        <Separator />
+                                        <MenuItem Command="ApplicationCommands.SelectAll" Header="全选" />
+                                    </ContextMenu>
+                                </TextBox.ContextMenu>
+                            </TextBox>
+                            <Button Grid.Column="2"
+                                    Width="32"
+                                    Height="32"
+                                    Margin="4,0,0,0"
+                                    Padding="0"
+                                    AutomationProperties.Name="粘贴服务端点"
+                                    Click="PasteAiEndpointClick"
+                                    ToolTip="粘贴服务端点">
+                                <iconPacks:PackIconLucide Width="15" Height="15" Kind="ClipboardPaste" />
+                            </Button>
+                        </Grid>
+                    </Border>
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid MinHeight="52">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="模型" />
+                            <TextBox Grid.Column="1" Height="32" VerticalContentAlignment="Center" Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                    </Border>
+                    <Border BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="0,1,0,1"
+                            Visibility="{Binding RequiresApiKey, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <Grid MinHeight="58">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="API Key" />
+                            <PasswordBox Grid.Column="1"
+                                         Height="32"
+                                         VerticalContentAlignment="Center"
+                                         PasswordChanged="AiApiKeyPasswordChanged"
+                                         ToolTip="输入后保存到 Windows 凭据管理器" />
+                            <TextBlock Grid.Column="2"
+                                       Margin="12,0,0,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Text="已安全保存"
+                                       Visibility="{Binding IsApiKeyConfigured, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </Grid>
+                    </Border>
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                        <Grid Margin="0,10,0,12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
+                            <TextBlock Margin="0,8,0,0" VerticalAlignment="Top" Text="已配置模型" />
+                            <ListBox Grid.Column="1"
+                                     MinHeight="72"
+                                     MaxHeight="132"
+                                     BorderThickness="0"
+                                     ItemsSource="{Binding ConfiguredModels}"
+                                     SelectedItem="{Binding SelectedConfiguration, Mode=TwoWay}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Width="390" MinHeight="42">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock FontWeight="SemiBold" Text="{Binding DisplayName}" />
+                                                <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Settings.Model}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1"
+                                                    Width="32"
+                                                    Height="32"
+                                                    Padding="0"
+                                                    AutomationProperties.Name="删除模型配置"
+                                                    Command="{Binding DataContext.DeleteConfigurationCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                    CommandParameter="{Binding}"
+                                                    ToolTip="删除模型配置">
+                                                <iconPacks:PackIconLucide Width="15" Height="15" Kind="Trash2" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+                <StackPanel Grid.Row="4" Orientation="Horizontal">
+                    <Button MinWidth="96" Command="{Binding SaveCommand}" Content="保存设置" Style="{StaticResource PrimaryButtonStyle}" />
+                    <Button MinWidth="96" Margin="8,0,0,0" Command="{Binding TestConnectionCommand}" Content="测试连接" />
+                    <TextBlock Margin="16,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding ConnectionStatus}" />
+                </StackPanel>
+            </Grid>
+        </TabItem>
+        <TabItem Header="团队连接">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Grid Margin="24,20,32,32" MaxWidth="920" HorizontalAlignment="Left" DataContext="{Binding TeamConnection}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="团队连接" />
+                    <TextBlock Grid.Row="1" Margin="0,8,0,18" Foreground="{DynamicResource TextSecondaryBrush}" Text="登录后可读取团队会议室并在线预约。令牌保存在 Windows 凭据管理器。未填写 OIDC 地址时，用“开发令牌姓名”直接登录（服务器需启用开发令牌模式）。" TextWrapping="Wrap" />
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="520" /></Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Text="服务端地址" />
+                        <TextBox Grid.Column="1" Height="32" Text="{Binding ApiBaseUrl, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="OIDC 授权地址" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Height="32" Text="{Binding AuthorizationEndpoint, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Grid.Row="2" VerticalAlignment="Center" Text="OIDC 令牌地址" />
+                        <TextBox Grid.Row="2" Grid.Column="1" Height="32" Text="{Binding TokenEndpoint, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Grid.Row="3" VerticalAlignment="Center" Text="客户端 ID" />
+                        <TextBox Grid.Row="3" Grid.Column="1" Height="32" Text="{Binding ClientId, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Grid.Row="4" VerticalAlignment="Center" Text="工作区 ID" />
+                        <TextBox Grid.Row="4" Grid.Column="1" Height="32" Text="{Binding WorkspaceId, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Grid.Row="5" VerticalAlignment="Center" Text="开发令牌姓名" />
+                        <TextBox Grid.Row="5" Grid.Column="1" Height="32" Text="{Binding DevTokenName, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Grid.Row="6" VerticalAlignment="Center" Text="开发令牌口令" />
+                        <TextBox Grid.Row="6" Grid.Column="1" Height="32" Text="{Binding DevTokenSharedSecret, UpdateSourceTrigger=PropertyChanged}" />
+                    </Grid>
+                    <StackPanel Grid.Row="3" Margin="0,18,0,0" Orientation="Horizontal">
+                        <Button MinWidth="120" Command="{Binding LoginCommand}" Content="登录团队" Style="{StaticResource PrimaryButtonStyle}" />
+                        <Button MinWidth="120" Margin="8,0,0,0" Command="{Binding LogoutCommand}" Content="退出登录" />
+                        <TextBlock Margin="16,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding StatusMessage}" />
+                    </StackPanel>
+                    <TextBlock Grid.Row="4" Margin="0,12,0,0" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding IsAuthenticated, StringFormat=登录状态：{0}}" />
+                </Grid>
+            </ScrollViewer>
+        </TabItem>
+    </TabControl>
+</UserControl>

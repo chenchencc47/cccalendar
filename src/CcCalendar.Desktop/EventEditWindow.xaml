@@ -1,0 +1,150 @@
+<Window x:Class="CcCalendar.Desktop.EventEditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:CcCalendar.Desktop.Views"
+        Title="编辑日程"
+        Width="1180"
+        Height="640"
+        MinWidth="1080"
+        MinHeight="560"
+        Background="{DynamicResource SurfaceBrush}"
+        FontFamily="Segoe UI Variable, Microsoft YaHei UI"
+        ShowInTaskbar="False"
+        AutomationProperties.Name="编辑日程窗口"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="22,18,22,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="16" />
+            <RowDefinition Height="36" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock FontSize="18" FontWeight="SemiBold" Text="编辑日程" />
+            <TextBlock x:Name="ValidationText"
+                       Grid.Column="1"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource DangerBrush}" />
+        </Grid>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="272" />
+                <ColumnDefinition Width="22" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Margin="0,0,0,6" Foreground="{DynamicResource TextSecondaryBrush}" Text="标题" />
+                <TextBox x:Name="TitleBox"
+                         Height="36"
+                         AutomationProperties.Name="标题"
+                         Padding="10,0"
+                         VerticalContentAlignment="Center"
+                         Text="{Binding EventTitle, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Margin="0,14,0,6" Foreground="{DynamicResource TextSecondaryBrush}" Text="会议室（可选）" />
+                <ComboBox Height="36"
+                          AutomationProperties.Name="会议室"
+                          ItemsSource="{Binding RoomOptions}"
+                          SelectedItem="{Binding SelectedRoom}"
+                          ToolTip="日程不一定是会议，可不选择会议室" />
+                <CheckBox Margin="0,14,0,0"
+                          AutomationProperties.Name="全天日程"
+                          Checked="AllDayCheckChanged"
+                          Content="全天（不指定时间）"
+                          IsChecked="{Binding IsAllDay}"
+                          Unchecked="AllDayCheckChanged" />
+                <TextBlock Margin="0,14,0,6" Foreground="{DynamicResource TextSecondaryBrush}" Text="日期" />
+                <DatePicker Height="36"
+                            AutomationProperties.Name="日期"
+                            SelectedDate="{Binding SelectedDate}" />
+                <Grid x:Name="TimeFields" Margin="0,14,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="6" />
+                        <RowDefinition Height="36" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="时间" />
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="22" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="StartTimeBox"
+                                  AutomationProperties.Name="开始时间"
+                                  DisplayMemberPath="Label"
+                                  IsEditable="True"
+                                  IsTextSearchEnabled="True"
+                                  ItemsSource="{Binding TimeOptions}"
+                                  MaxDropDownHeight="280"
+                                  SelectedItem="{Binding SelectedStartTime}"
+                                  StaysOpenOnEdit="True"
+                                  TextSearch.TextPath="Label" />
+                        <TextBlock Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Text="至" />
+                        <ComboBox x:Name="EndTimeBox"
+                                  Grid.Column="2"
+                                  AutomationProperties.Name="结束时间"
+                                  DisplayMemberPath="Label"
+                                  IsEditable="True"
+                                  IsTextSearchEnabled="True"
+                                  ItemsSource="{Binding TimeOptions}"
+                                  MaxDropDownHeight="280"
+                                  SelectedItem="{Binding SelectedEndTime}"
+                                  StaysOpenOnEdit="True"
+                                  TextSearch.TextPath="Label" />
+                    </Grid>
+                </Grid>
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <CheckBox x:Name="MeetingReminderCheckBox"
+                              VerticalAlignment="Center"
+                              AutomationProperties.Name="会议提前提醒"
+                              Checked="MeetingReminderCheckChanged"
+                              Content="会议提前提醒"
+                              ToolTip="仅为当前日程设置提醒；取消勾选表示不提醒"
+                              Unchecked="MeetingReminderCheckChanged" />
+                    <ComboBox x:Name="MeetingReminderMinutesBox"
+                              Grid.Column="2"
+                              Height="36"
+                              IsEditable="True"
+                              IsEnabled="False"
+                              AutomationProperties.Name="会议提前提醒分钟"
+                              ToolTip="填写会议开始前多少分钟提醒，范围 1 到 1440 分钟">
+                        <ComboBoxItem Content="5" />
+                        <ComboBoxItem Content="10" />
+                        <ComboBoxItem Content="15" />
+                        <ComboBoxItem Content="30" />
+                        <ComboBoxItem Content="60" />
+                        <ComboBoxItem Content="120" />
+                    </ComboBox>
+                </Grid>
+            </StackPanel>
+            <Border Grid.Column="2"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1,0,0,0"
+                    Padding="18,0,0,0">
+                <views:RoomBookingPicker x:Name="Picker"
+                                         DateSwitched="PickerDateSwitched"
+                                         Picked="PickerPicked" />
+            </Border>
+        </Grid>
+        <StackPanel Grid.Row="4" HorizontalAlignment="Right" Orientation="Horizontal">
+            <Button Width="72" AutomationProperties.Name="取消" IsCancel="True" Content="取消" />
+            <Button Width="80"
+                    Margin="8,0,0,0"
+                    AutomationProperties.Name="保存"
+                    Click="SaveClick"
+                    Content="保存"
+                    IsDefault="True"
+                    Style="{StaticResource PrimaryButtonStyle}" />
+        </StackPanel>
+    </Grid>
+</Window>

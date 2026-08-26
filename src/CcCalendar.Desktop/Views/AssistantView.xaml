@@ -1,0 +1,458 @@
+<UserControl x:Class="CcCalendar.Desktop.Views.AssistantView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ai="clr-namespace:CcCalendar.Core.AI;assembly=CcCalendar.Core"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:local="clr-namespace:CcCalendar.Desktop.Views"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DesignHeight="680"
+             d:DesignWidth="960"
+             mc:Ignorable="d">
+    <Grid Margin="28,24,28,28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="18" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="36" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock VerticalAlignment="Center" Style="{StaticResource PageTitleStyle}" Text="AI 助手" />
+            <StackPanel x:Name="AssistantCommandBar"
+                        HorizontalAlignment="Right"
+                        Orientation="Horizontal">
+                <Button MinWidth="88" Padding="14,5" Command="{Binding BuildDailyPlanCommand}" Content="每日计划" />
+                <Button MinWidth="88" Margin="8,0,0,0" Padding="14,5" AutomationProperties.Name="生成周报草稿" Command="{Binding BuildWeeklyReportCommand}" Content="周报草稿" />
+                <Button MinWidth="104" Margin="8,0,0,0" Padding="14,5" AutomationProperties.Name="撤销上次操作" Command="{Binding UndoCommand}" Content="撤销上次操作" />
+                <Button MinWidth="112" Margin="8,0,0,0" Padding="14,5" AutomationProperties.Name="重试上次请求" Command="{Binding RetryCommand}" Content="重试上次请求" />
+            </StackPanel>
+            <Border x:Name="AssistantContextBar"
+                    Grid.Row="2"
+                    Padding="10,6"
+                    Background="{DynamicResource SubtleSurfaceBrush}"
+                    CornerRadius="4">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <TextBlock Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="权限" />
+                        <ToggleButton Content="只读"
+                                      IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static ai:AiAssistantMode.ReadOnly}}"
+                                      Style="{StaticResource SegmentToggleStyle}" />
+                        <ToggleButton Margin="4,0,0,0"
+                                      Content="写入（需确认）"
+                                      IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static ai:AiAssistantMode.Write}}"
+                                      Style="{StaticResource SegmentToggleStyle}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="模型" />
+                        <ComboBox Width="190"
+                                  DisplayMemberPath="DisplayName"
+                                  ItemsSource="{Binding AvailableModels}"
+                                   SelectedItem="{Binding SelectedModel, Mode=TwoWay}" />
+                        <TextBlock Margin="14,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Text="{Binding ProviderStatus}" />
+                        <TextBlock Margin="14,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Text="{Binding AttachmentStatus}" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+            <StackPanel Grid.Row="4" Orientation="Horizontal">
+                <Button MinWidth="88"
+                        Padding="14,5"
+                        AutomationProperties.Name="新建对话"
+                        Command="{Binding NewChatCommand}"
+                        Content="新建对话" />
+                <Button MinWidth="72"
+                        Margin="8,0,0,0"
+                        Padding="14,5"
+                        AutomationProperties.Name="删除当前对话"
+                        Command="{Binding DeleteChatCommand}"
+                        Content="删除"
+                        ToolTip="删除当前对话" />
+                <TextBlock Margin="16,0,8,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Text="会话" />
+                <ComboBox MinWidth="280"
+                          AutomationProperties.Name="历史会话"
+                          DisplayMemberPath="Title"
+                          ItemsSource="{Binding Sessions}"
+                          SelectedItem="{Binding CurrentSession, Mode=TwoWay}"
+                          ToolTip="切换历史对话" />
+            </StackPanel>
+        </Grid>
+        <ListBox x:Name="MessageList"
+                 Grid.Row="2"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 ItemsSource="{Binding Messages}"
+                 PreviewMouseWheel="MessageListPreviewMouseWheel"
+                 ScrollViewer.CanContentScroll="False"
+                 ScrollViewer.PanningMode="VerticalOnly"
+                 VirtualizingPanel.IsVirtualizing="False">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <ContentPresenter HorizontalAlignment="Stretch" />
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Border Padding="0,12"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="0,0,0,1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel Grid.Row="0"
+                                        Margin="0,0,0,8"
+                                        Orientation="Horizontal">
+                                <Border Width="24"
+                                        Height="24"
+                                        Background="{DynamicResource AccentBrush}"
+                                        CornerRadius="12">
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="White">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="AI" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsUser}" Value="True">
+                                                        <Setter Property="Text" Value="你" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Border>
+                                <TextBlock Margin="8,0,0,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="12"
+                                           FontWeight="SemiBold">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Text" Value="助理" />
+                                            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsUser}" Value="True">
+                                                    <Setter Property="Text" Value="你" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                            <Expander Grid.Row="1"
+                                      Margin="0,0,0,8"
+                                      Header="思考"
+                                      Visibility="{Binding HasThinking, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <Border Padding="10,8"
+                                        Background="{DynamicResource SubtleSurfaceBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6">
+                                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Text="{Binding ThinkingText}"
+                                               TextWrapping="Wrap" />
+                                </Border>
+                            </Expander>
+                            <TextBox Grid.Row="2"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{DynamicResource TextPrimaryBrush}"
+                                     IsReadOnly="True"
+                                     IsTabStop="False"
+                                     Padding="0"
+                                     Text="{Binding Text, Mode=OneWay}"
+                                     TextWrapping="Wrap"
+                                     VerticalScrollBarVisibility="Disabled">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsMarkdown}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+                            <local:AssistantMarkdownViewer Grid.Row="2"
+                                                           Background="Transparent"
+                                                           BorderThickness="0"
+                                                           HorizontalScrollBarVisibility="Disabled"
+                                                           IsToolBarVisible="False"
+                                                           Markdown="{Binding Text}"
+                                                           Padding="0"
+                                                           VerticalScrollBarVisibility="Disabled">
+                                <local:AssistantMarkdownViewer.Style>
+                                    <Style TargetType="local:AssistantMarkdownViewer">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsMarkdown}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </local:AssistantMarkdownViewer.Style>
+                            </local:AssistantMarkdownViewer>
+                            <Button Grid.Row="3"
+                                    Width="26"
+                                    Height="26"
+                                    Margin="0,8,0,0"
+                                    Padding="0"
+                                    AutomationProperties.Name="复制消息"
+                                    HorizontalAlignment="Left"
+                                    Click="CopyMessageClick"
+                                    CommandParameter="{Binding Text}"
+                                    ToolTip="复制消息">
+                                <iconPacks:PackIconLucide Width="14" Height="14" Kind="Copy" />
+                            </Button>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <Border Grid.Row="3"
+                Padding="16"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Visibility="{Binding HasPendingPreview, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="10" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="14" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding PendingPreview.Title}" />
+                <ItemsControl Grid.Row="2" ItemsSource="{Binding PendingPreview.Fields}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid MinHeight="28">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="90" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Label}" />
+                                <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Grid.Row="4" HorizontalAlignment="Right" Orientation="Horizontal">
+                    <Button MinWidth="76" AutomationProperties.Name="取消创建提案" Command="{Binding CancelCommand}" Content="取消" />
+                    <Button MinWidth="76" Margin="8,0,0,0" AutomationProperties.Name="确认创建提案" Command="{Binding ConfirmCommand}" Content="确认创建" Style="{StaticResource PrimaryButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+        <Border Grid.Row="6"
+                Margin="0,14,0,0"
+                Padding="10"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="18">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <ItemsControl Margin="4,0,4,0"
+                              ItemsSource="{Binding Attachments}"
+                              Visibility="{Binding HasAttachments, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,8,4"
+                                    Padding="8,4,4,4"
+                                    Background="{DynamicResource PageBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="4">
+                                <StackPanel Orientation="Horizontal">
+                                    <iconPacks:PackIconLucide Width="14" Height="14" VerticalAlignment="Center" Kind="FileText" />
+                                    <TextBlock Margin="6,0,4,0" VerticalAlignment="Center" Text="{Binding FileName}" />
+                                    <Button Width="24"
+                                            Height="24"
+                                            Padding="0"
+                                            AutomationProperties.Name="移除附件"
+                                            Command="{Binding DataContext.RemoveAttachmentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            ToolTip="移除附件">
+                                        <iconPacks:PackIconLucide Width="13" Height="13" Kind="X" />
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="36" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="36" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="36" />
+                    </Grid.ColumnDefinitions>
+                    <Button Width="36"
+                            Height="36"
+                            Padding="0"
+                            AutomationProperties.Name="添加附件"
+                            Click="AttachFilesClick"
+                            ToolTip="添加附件">
+                        <iconPacks:PackIconLucide Width="16" Height="16" Kind="Paperclip" />
+                    </Button>
+                    <TextBox Grid.Column="2"
+                         AutomationProperties.Name="AI 消息"
+                         MinHeight="36"
+                         MaxHeight="96"
+                         Padding="6"
+                         AcceptsReturn="True"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         PreviewKeyDown="InputBoxPreviewKeyDown"
+                         Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
+                         TextWrapping="Wrap"
+                         ToolTip="Enter 发送，Shift+Enter 换行"
+                         VerticalScrollBarVisibility="Auto" />
+                    <Button Grid.Column="4"
+                        Width="36"
+                        Height="36"
+                        Padding="0"
+                        AutomationProperties.Name="发送"
+                        Command="{Binding SendCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        ToolTip="发送">
+                         <iconPacks:PackIconLucide Width="16" Height="16" Foreground="White" Kind="Send" />
+                     </Button>
+                    <Button Grid.Column="6"
+                            Width="36"
+                            Height="36"
+                            Padding="0"
+                            AutomationProperties.Name="停止请求"
+                            Command="{Binding StopCommand}"
+                            ToolTip="停止请求">
+                        <iconPacks:PackIconLucide Width="16" Height="16" Kind="Square" />
+                    </Button>
+                </Grid>
+            </Grid>
+        </Border>
+        <Border Grid.Row="5"
+                Margin="0,10,0,0"
+                Padding="16"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Visibility="{Binding HasPendingConflict, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="12" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock FontSize="16"
+                           FontWeight="SemiBold"
+                           Text="{Binding ConflictPrompt.ConflictCount, StringFormat=检测到 {0} 项时间冲突}" />
+                <TextBlock Grid.Row="2"
+                           Margin="0,0,0,10"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           Text="{Binding ConflictSummary}"
+                           TextWrapping="Wrap" />
+                <StackPanel Grid.Row="3" Orientation="Horizontal">
+                    <Button MinWidth="92" AutomationProperties.Name="保留重叠" Command="{Binding KeepOverlapCommand}" Content="保留重叠" />
+                    <Button MinWidth="92" Margin="8,0,0,0" AutomationProperties.Name="寻找空闲时间" Command="{Binding FindAvailableTimeCommand}" Content="寻找空闲" Style="{StaticResource PrimaryButtonStyle}" />
+                    <Button MinWidth="92" Margin="8,0,0,0" AutomationProperties.Name="修改冲突时间" Command="{Binding ModifyConflictCommand}" Content="修改时间" />
+                </StackPanel>
+                <ItemsControl Grid.Row="4" Margin="0,12,0,0" ItemsSource="{Binding AvailableSlots}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Margin="0,0,8,8"
+                                    AutomationProperties.Name="使用此空闲时间"
+                                    Command="{Binding DataContext.UseAvailableSlotCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding LocalStart, StringFormat={}{0:HH\\:mm}}" />
+                                    <TextBlock Margin="4,0" Text="-" />
+                                    <TextBlock Text="{Binding LocalEnd, StringFormat={}{0:HH\\:mm}}" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+        </Border>
+        <Border Grid.Row="4"
+                Margin="0,10,0,0"
+                Padding="16"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Visibility="{Binding HasPendingChange, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="10" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="14" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock FontSize="16" FontWeight="SemiBold" Text="{Binding PendingChange.Description}" />
+                <ItemsControl Grid.Row="2" ItemsSource="{Binding PendingChange.Changes}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Margin="0,3" Text="{Binding}" TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Grid.Row="4" HorizontalAlignment="Right" Orientation="Horizontal">
+                    <Button MinWidth="76" AutomationProperties.Name="取消变更提案" Command="{Binding CancelChangeCommand}" Content="取消" />
+                    <Button MinWidth="76" Margin="8,0,0,0" AutomationProperties.Name="确认变更提案" Command="{Binding ConfirmChangeCommand}" Content="确认变更" Style="{StaticResource PrimaryButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
