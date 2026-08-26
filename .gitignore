@@ -19,6 +19,16 @@ coverage/
 *.coveragexml
 *_pid.txt
 
+# Local QA/debug scripts and screenshots
+/qa*.ps1
+/open_qa.ps1
+/find_day*.ps1
+/fixbom*.ps1
+/fb.ps1
+/test_quotes.ps1
+/screenshots/
+/myProgramcccalendarscreenshots/
+
 # Packages and generated files
 packages/
 *.nupkg

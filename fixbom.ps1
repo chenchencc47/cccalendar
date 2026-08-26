@@ -1,1 +1,0 @@
-$path = "D:/myProgram/cccalendar/qa_step3.ps1"; $content = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8); $utf8Bom = New-Object System.Text.UTF8Encoding($true); [System.IO.File]::WriteAllText($path, $content, $utf8Bom); Write-Output "done"
