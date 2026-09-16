@@ -17,7 +17,12 @@
 
 ## 尚未完成的事项
 
-- **P61（已延期项）**：约 14 处紧凑型表面的小字号（`DesktopComponentWindow`/`DesktopWorkbenchWindow`/`QuickPanelWindow` 的 9/10/11、`ReminderPopupWindow` 的 15）未并入字号阶梯。这三个桌面窗口**只有源码文本断言、没有运行时布局测试**，并进 12 有挤爆风险，需单独一轮带人工核验。
+- **桌面组件小字号不跟随「字体大小/缩放」设置（已调查，属真实缺陷，待决策）**。
+  - 现状：`DesktopComponentWindow`/`DesktopWorkbenchWindow` 的月历格用**固定** 9/10/11px，而同一窗口的正文由 `DesktopAppearanceController` 按 `window.FontSize = value.FontSize * value.Scale` 驱动。因此用户拖动桌面组件的「字体大小 / 界面缩放」滑杆时，**月历格里的日期角标、农历、日程文字完全不变**——只有正文标题跟着变。
+  - 这比"字号偏小"更值得修：不是观感问题，而是**设置项对部分内容不生效**。
+  - 修法（需决策，故未擅自实施）：把这几档抽成「倍数令牌」（如 `DesktopCaptionScale = 0.86`、`DesktopMicroScale = 0.71`），由控制器在写入 `UiBodyFontSize` 时一并计算，例如 `Resources["DesktopCaptionSize"] = fontSize * 0.86`。这样固定 px 变成随设置缩放的相对值，既保持紧凑表面的层级比例，又让设置真正生效。
+  - 为什么不在本轮直接做：这会扩展 `DesktopAppearanceSettingsState` / `DesktopAppearanceController` 的既有外观体系（新增令牌与计算），而这三个窗口**只有源码文本断言、没有运行时布局测试**——改完无法自动验证，只能靠人工缩放核验。属于"值得做但需要确认方向"的改动。
+- **`ReminderPopupWindow` 的 15px 标题**：380×190 固定尺寸弹窗，15 处于"区块标题 16"与"正文 14"之间。单独一档、无同类项，并进 16 会让本就紧张的高度再多占一点，故保留。
 - **View 级区块间距重排**：`Margin="24,20,24,28"` 这类逐页间距未逐一重排。属高回归风险、低可验证性工作，截图显示当前留白已可接受；若要做应逐页单独切片 + 截图对比。
 - **长期并行**：P15-09d 两地云端验收；生产 HTTPS/OIDC（P47）与角色矩阵、令牌撤销（见 `docs/VERSION_EVOLUTION_PLAN.md`）。
 - **文档陈旧**：已清掉一批（见 P63），仍有零星历史文档版本号可能滞后。
