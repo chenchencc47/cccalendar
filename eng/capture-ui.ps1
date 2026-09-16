@@ -48,6 +48,40 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+<#
+.SYNOPSIS
+    Crop the unpainted (pure black) band PrintWindow leaves on the right/bottom edge.
+#>
+function RemoveUnpaintedEdge {
+    param([System.Drawing.Bitmap]$Bitmap)
+
+    $midY = [int]($Bitmap.Height / 2)
+    $midX = [int]($Bitmap.Width / 2)
+
+    $right = $Bitmap.Width - 1
+    while ($right -gt 0) {
+        $c = $Bitmap.GetPixel($right, $midY)
+        if (-not ($c.R -eq 0 -and $c.G -eq 0 -and $c.B -eq 0)) { break }
+        $right--
+    }
+
+    $bottom = $Bitmap.Height - 1
+    while ($bottom -gt 0) {
+        $c = $Bitmap.GetPixel($midX, $bottom)
+        if (-not ($c.R -eq 0 -and $c.G -eq 0 -and $c.B -eq 0)) { break }
+        $bottom--
+    }
+
+    $targetWidth = [Math]::Max(1, $right + 1)
+    $targetHeight = [Math]::Max(1, $bottom + 1)
+    if ($targetWidth -eq $Bitmap.Width -and $targetHeight -eq $Bitmap.Height) {
+        return $Bitmap.Clone()
+    }
+
+    $rect = New-Object System.Drawing.Rectangle 0, 0, $targetWidth, $targetHeight
+    return $Bitmap.Clone($rect, $Bitmap.PixelFormat)
+}
+
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName UIAutomationClient
@@ -227,9 +261,16 @@ if ($VerbosePreference -ne 'SilentlyContinue') {
         $graphics.ReleaseHdc($hdc)
         $graphics.Dispose()
 
-        $file = Join-Path $OutputDirectory "$slug-$modeTag-$sizeTag.png"
-        $bitmap.Save($file, [System.Drawing.Imaging.ImageFormat]::Png)
+        # GetWindowRect includes the resize border, and on a DPI-scaled display
+        # PrintWindow leaves an unpainted band along the right/bottom edge
+        # (measured: 8px at 1366x768 and at 1920x1080). Crop it so the evidence
+        # does not look like clipped content.
+        $trimmed = RemoveUnpaintedEdge -Bitmap $bitmap
         $bitmap.Dispose()
+
+        $file = Join-Path $OutputDirectory "$slug-$modeTag-$sizeTag.png"
+        $trimmed.Save($file, [System.Drawing.Imaging.ImageFormat]::Png)
+        $trimmed.Dispose()
         Write-Host "  captured $slug -> $(Split-Path -Leaf $file)" -ForegroundColor Green
         $captured++
     }
@@ -244,3 +285,4 @@ finally {
         $process.WaitForExit(10000) | Out-Null
     }
 }
+
