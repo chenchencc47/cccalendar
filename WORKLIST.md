@@ -4,10 +4,10 @@
 
 | 项 | 值 |
 |----|-----|
-| 当前发布版本 | `0.6.7`（以 `version.json` 为准） |
+| 当前发布版本 | `0.6.8`（以 `version.json` 为准） |
 | 最后更新 | 2026-09-16 |
-| 测试基线 | **521/521**（Core 93、Infrastructure 104、Desktop 280、Server 44）；`eng\verify.cmd` 退出 0，build 0 警告 0 错误 |
-| 当前阶段 | P0–P17、P23–P27 团队会议室协作、P60/P61/P62 UI 观感与动效、P63 文档与安全清理、P64 桌面组件字号跟随缩放、P65 页面级留白统一、P66 0.6.7 发布 —— **均已完成并发布** |
+| 测试基线 | **524/524**（Core 93、Infrastructure 106、Desktop 281、Server 44）；`eng\verify.cmd` 退出 0，build 0 警告 0 错误 |
+| 当前阶段 | P0–P17、P23–P27 团队会议室协作、P60/P61/P62 UI 观感与动效、P63 文档与安全清理、P64 桌面组件字号跟随缩放、P65 页面级留白统一、P66 0.6.7 发布、P67 版本号硬编码修复与 0.6.8 发布 —— **均已完成并发布** |
 | 阻塞项 | 无 |
 | 安全状态 | 明文口令与密钥已从当前跟踪树移除；**轮换由用户决定暂缓，作为已知并接受的风险记录**（见「安全事项」） |
 
@@ -1183,6 +1183,26 @@ Verify：完整验证命令、结果、必要的人工检查
   - 未在本切片做的部分（明确记录）：`View` 级的区块间距（`Margin="24,20,24,28"` 这类）未逐一重排。逐页调整 28 个文件的间距属于高回归风险、低可验证性的工作，且截图显示当前各页留白已可接受；若后续仍需调整，应逐页单独切片并用截图对比。
   - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **514/514**（Core 93、Infrastructure 104、Desktop 273、Server 44）。
 
+## P67 - 版本号硬编码修复与 0.6.8 发布
+
+- [x] P67-01 修复「设置 → 应用更新」版本号与更新说明不更新（用户报告）。
+  - **根因（两处硬编码，与发版流程完全脱节）**：
+    1. `SettingsView.xaml` 的 TextBlock 写死 `Text="当前版本 0.6.5；启动时也会自动检查"`——更新到 0.6.7 后界面仍显示 0.6.5；
+    2. `SettingsView.xaml.cs` 的 `CurrentReleaseNotes` 常量写死了 **0.6.5 的更新说明**——点开「查看更新内容」看到的是错误版本的说明。
+  - **关键对照**：手动「检查更新」那条路径本来就是对的（用 `result.CurrentVersion`）。只有这两处**静态展示**是写死的——所以问题只在"不点检查更新时看到的字"，一点检查就正确。
+  - 修法：
+    - `App` 新增 `internal static CurrentVersion`（读程序集），并把 `CheckForUpdatesAsync` 内 3 处重复的 `GetName().Version` 也复用它 → **版本号收敛为单一来源**（`csproj` 的 `<Version>`）。
+    - 版本标签改为 `Loaded` 时赋值；更新说明改为从**公网清单的 `releaseNotes`** 读取（该字段随发版自动更新，不会过期）。
+    - 为此新增 `ApplicationUpdateClient.FetchManifestAsync`：与 `CheckAsync` 不同，它**不做版本过滤**——远程版本与本地相同时也能取到"当前版本"的说明。清单不可达时给出明确提示，而不是展示可能是错的旧说明。
+    - 删除写死的 `CurrentReleaseNotes` 常量。
+  - Red→Green：`ApplicationUpdateClientTests` 新增 2 项（远程不更新时仍返回清单、非 HTTPS 拒绝）；`UiDesignContractTests` 新增 `ViewsDoNotHardcodeAnApplicationVersion`（扫描界面代码里的 `x.y.z` 字面量，**先剥注释**——说明"曾经写死成 0.6.5"的注释本身含版本号不应算违规）。该测试已实测：植入一个真实违规会失败、还原后通过，确认不是空断言。
+  - 同时更新既有的 `SettingsExposeReleaseNotesAction`：改为断言新行为（调用 `FetchReleaseNotesAsync`、且不再存在 `CurrentReleaseNotes`）。
+  - 验证：`eng\verify.cmd` 退出 0；build 0 警告 0 错误；完整回归 **524/524**；**隔离实例 UI Automation 实测读到「当前版本 0.6.7；启动时也会自动检查」**（不再需要人工眼看）。
+- [x] P67-02 发布 0.6.8。
+  - 0.6.7 已上传 OSS 后才发现该缺陷。按发布指南「不覆盖旧版本目录」的约束，**未覆盖 0.6.7**，而是递增到 0.6.8。
+  - 产物：`artifacts\installer\cccalendar-0.6.8-win-x64-setup.exe`，**60,164,672 bytes**，SHA-256 `1155320909E21183A3F1AFE70ACE5F40F5B1B23F01A94F0AC477A9D39155CBDF`。
+  - 公网校验：清单 `version=0.6.8`、`sha256` 与本地一致、`releaseNotes` 为 0.6.8 内容（下载后按字节比对，与本地 785 bytes 逐字节一致，中文正常）、安装包 `HEAD 200` 且 `ContentLength` 一致。
+  - 服务端仍无需部署：本轮只动 Desktop 与 Infrastructure。
 ## P66 - 0.6.7 发布
 
 - [x] P66 构建并发布 0.6.7 安装包，上传 OSS 并完成公网校验。
