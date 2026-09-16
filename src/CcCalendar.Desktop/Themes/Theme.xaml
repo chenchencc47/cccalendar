@@ -870,6 +870,12 @@
         <Setter Property="Padding" Value="12,0" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+        <!--
+            显式设置自动化名称。若不设置，WPF 会回退到数据项的 ToString()，
+            读屏软件会念出 "NavigationItemViewModel { Destination = Today, Label = 今天, ... }"，
+            既不可读也无法用 UI Automation 按名称定位。
+        -->
+        <Setter Property="AutomationProperties.Name" Value="{Binding Label}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListBoxItem">

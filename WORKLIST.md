@@ -1112,6 +1112,18 @@ Verify：完整验证命令、结果、必要的人工检查
 
 - [ ] P61-03 微组件库：LoadingRing（加载环）、StateDot（状态点，带追逐动画）、ConnectionIndicator（连接状态，用在设置页团队连接）。参考实现里这三者都有独立动画，是"界面活起来"的主要来源。
 - [ ] P61-04 截图工具与效果对比图：仓库当前无 QA 截图脚本（`.gitignore` 排除了 `/qa*.ps1`），需补一个可持续使用的截图入口，输出"快速新增 + 设置页"的改动前后对比，作为观感效果证据。
+- [x] P61-04 截图工具与效果核验。
+  - 新增 `eng\capture-ui.ps1`：启动真实应用实例（`-Isolated` 时用 `CCCALENDAR_HOME` 指向 `artifacts/ui-shots/home`，不触碰本机数据），设置主题与窗口尺寸，用 UI Automation 的 `SelectionItemPattern` 逐页切换并截图到 `artifacts/ui-shots/`。仓库此前**没有任何截图工具**（`.gitignore` 排除了 `/qa*.ps1`），而 UI_DESIGN §9 要求按分辨率验收，故补此入口。
+  - 已产出浅色与深色各 9 页（1366×768），文件名形如 `statistics-dark-1366x768.png`。
+  - **顺带修掉一个真实无障碍缺陷**：导航项此前未显式设置自动化名称，WPF 回退到数据项的 `ToString()`，读屏软件会念出 `NavigationItemViewModel { Destination = Today, Label = 今天, ... }`。已在 `NavigationItemStyle` 加 `AutomationProperties.Name="{Binding Label}"` —— 这既修好了读屏，也让 UI Automation 能按名称定位（截图工具正是靠它工作）。
+  - **三个工具链踩坑记录**（都写进脚本注释，避免重复）：
+    1. Windows PowerShell 5.1 在**无 BOM** 时按 ANSI 读取 `.ps1`，脚本里的中文字面量会直接把解析器弄坏。脚本已改为**纯 ASCII**，中文标签用 `([char]0x....)` 构造，并写入 UTF-8 BOM。
+    2. `[char]0x4ECA + [char]0x5929,` **不加括号**时，`[char]` 转换会跨越逗号列表作用到整个数组，把 9 个元素折叠成**一个字符串**（表现为"导航项找不到"）。每项必须加括号。
+    3. 主题设置键是 `theme`（小写），不是 `themePreference`；写错键会让浅色/深色截图**字节完全相同**（最初 9 对文件大小一模一样才发现）。
+  - 另：`$home` 在 PowerShell 中是只读变量，已改名 `$dataRoot`。
+  - 人工核验结论：浅色/深色下卡片均为"略高于页面的表面 + 极淡描边"（不再是 1px 表格线），导航项圆角与普通按钮一致，`统计` 五张卡在深色下层次清晰。
+  - Verify：`eng\verify.cmd` 退出 0；build 0 警告 0 错误；完整回归 **507/507**。
+
 - [ ] P61-05 其余交互控件接入动效：`ComboBoxItem`、`TabItem`、`MenuItem`、`ToggleButton`（四处的悬停仍是瞬间换色）。
 - [ ] P61-06 留白与层级：按参考实现拉开控件高度与区块留白；评估"抬高表面改用 0.5px 描边 + 柔和阴影替代 1px 硬边框"（需先新增阴影令牌，当前主题 0 个阴影）。
 
