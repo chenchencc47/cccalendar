@@ -1,8 +1,8 @@
 # cccalendar 方案设计
 
 > 状态：需求与技术基线已确认  
-> 最后更新：2026-08-17  
-> 当前阶段：P0-P14 已完成并通过验证；联网协作方案已确认，按 P15 逐步实现
+> 最后更新：2026-09-16  
+> 当前阶段：P0-P17 与团队会议室协作已完成并发布（当前版本 0.6.6）； UI 观感与动效见 [UI_OPTIMIZATION_PLAN.md](UI_OPTIMIZATION_PLAN.md)（P60/P61/P62 已完成）； 后续版本路线见 [VERSION_EVOLUTION_PLAN.md](VERSION_EVOLUTION_PLAN.md)
 
 ## 1. 产品定位
 

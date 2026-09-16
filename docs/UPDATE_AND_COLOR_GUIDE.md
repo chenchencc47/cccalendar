@@ -1,4 +1,4 @@
-# 更新与颜色设置操作说明
+﻿# 更新与颜色设置操作说明
 
 ## 检查更新
 
@@ -46,7 +46,7 @@
 
 `https://cccalendar-releases-01.oss-cn-heyuan.aliyuncs.com/releases/version.json`
 
-当前发布版本：`0.4.5`
+当前发布版本：`0.6.6`
 
 ## 助理输入区
 

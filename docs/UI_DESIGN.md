@@ -60,7 +60,10 @@
 
 **圆角**（必须是 `CornerRadius` 类型，不能是 `sys:Double`——见 §11 的类型陷阱）：`RadiusMd` 6（小组件内部：进度条、滑块轨道、勾选框）、`RadiusSm` 10（按钮、输入框、列表项）、`RadiusLg` 12（卡片、面板、抬高表面）、`RadiusXl` 16（弹窗、下拉、上下文菜单、提示）。上限 16。
 
-**字号**（`sys:Double`）：`FontCaptionSize` 12、`FontCompactSize` 13、`UiBodyFontSize` 14（正文）、`FontPanelTitleSize` 16、`FontPageTitleSize` 20、`FontClockSize` 32。
+**字号**（`sys:Double`）：`FontCaptionSize` 12、`FontCompactSize` 13、`UiBodyFontSize` 14（正文）、`FontPanelTitleSize` 16、`FontBrandSize` 18（品牌字标与工具页统计数字）、`FontPageTitleSize` 20、`FontStatNumberSize` 24（统计卡 KPI 数字）、`FontClockSize` 32、`FontTimerSize` 44（倒计时/番茄钟大数字）。
+
+> 阶梯为 12/13/14/16/18/20/24/32/44，由契约测试 `ViewsUseOnlyArchivedFontSizes` 守住：页面与窗口 XAML 不得出现阶梯外的字号字面量。
+> **豁免**：`DesktopComponentWindow`、`DesktopWorkbenchWindow`、`QuickPanelWindow`、`ReminderPopupWindow` 是紧凑型表面——桌面组件可被用户缩到 220px 宽，字号由组件自身的缩放/字号设置驱动，提醒弹窗为 380×190 固定尺寸。这四个文件不在该契约的扫描范围内，改动它们需要人工布局核验。
 
 **控件尺寸**（`sys:Double`）：`UiControlHeight` 32、`UiCompactControlHeight` 28、`ControlHeightPrimary` 36、`IconButtonSize` 32、`SidebarWidth` 200、`BrandBarHeight` 56、`NavigationItemHeight` 38。
 

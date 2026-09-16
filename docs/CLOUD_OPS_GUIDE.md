@@ -1,6 +1,6 @@
-# 云服务器与客户端操作手册（cccalendar 团队版）
+﻿# 云服务器与客户端操作手册（cccalendar 团队版）
 
-> 本手册按当前实际环境编写：阿里云 ECS（Ubuntu 22.04，47.120.6.126）+ Windows 客户端 0.5.2。
+> 本手册按当前实际环境编写：阿里云 ECS（Ubuntu 22.04，47.120.6.126）+ Windows 客户端（安装包版本以 OSS 清单 `version.json` 为准）。
 > 按场景索引，找到对应章节复制命令执行即可。
 > **注意：本文件包含口令等敏感信息，仅限团队内部使用，不要外传。**
 
@@ -228,7 +228,7 @@ systemctl daemon-reload && systemctl restart cccalendar
 
 ### 4.1 新电脑安装与登录（发给同事的说明）
 
-1. 拿到安装包 `cccalendar-0.5.2-win-x64-setup.exe`（约 60MB），双击安装；
+1. 拿到安装包 `cccalendar-<版本号>-win-x64-setup.exe`（约 60MB，版本号见公网清单），双击安装；
 2. 打开 cccalendar → 设置 → 团队连接，填写：
 
 | 字段 | 填什么 |
