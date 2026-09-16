@@ -1,5 +1,5 @@
-#define AppName "cccalendar"
-#define AppVersion "0.6.6"
+﻿#define AppName "cccalendar"
+#define AppVersion "0.6.7"
 #define AppPublisher "cccalendar"
 #define AppExecutable "cccalendar.exe"
 
