@@ -30,6 +30,24 @@
     <SolidColorBrush x:Key="ElevationProminentBrush" Color="#FFFFFF" />
 
     <!--
+        交互叠加色（P61-01）。借鉴 deepseek-harness 的做法：悬停/按下是**半透明叠加**
+        而不是不透明换色。
+
+        这样做有两个好处：① 同一组叠加色在任意底色（主表面、强调按钮、列表项、浮层）上
+        都能正确工作，不需要为每种底色各配一套 hover 色；② 叠加色的 alpha 可以平滑动画，
+        因此悬停/按下能做出过渡效果，而换色方案在动画期间会丢失 DynamicResource 引用。
+
+        现有的不透明 HoverBrush/PressedBrush 保留不动（仍有 8 处消费方，且部分场景需要
+        不透明换色），新老并存。
+    -->
+    <!-- 交互叠加色（P61-01）：浅色用深色叠加，深色用白色叠加（见 DarkTheme.xaml）。 -->
+    <SolidColorBrush x:Key="InteractionHoverBrush" Color="#0F263148" />
+    <SolidColorBrush x:Key="InteractionPressedBrush" Color="#1A263148" />
+    <!-- 强调色底上使用白色叠加，避免深色叠加把蓝色压暗得失真。 -->
+    <SolidColorBrush x:Key="InteractionHoverLightBrush" Color="#14FFFFFF" />
+    <SolidColorBrush x:Key="InteractionPressedLightBrush" Color="#24FFFFFF" />
+
+    <!--
         会议室看板语义色（P60-03）。
 
         看板是自绘控件，不能直接用主题的通用画刷：它需要「底 + 字」成对的状态色才能
@@ -76,16 +94,25 @@
     <sys:Double x:Key="SpacingXl">24</sys:Double>
 
     <!--
-        圆角：UI_DESIGN §2.2，最大不超过 8px。
+        圆角：UI_DESIGN §2.2。按钮 10、卡片/列表项 12、弹窗与浮层 16。
 
         必须是 CornerRadius 而不是 sys:Double：`Border.CornerRadius` 需要 CornerRadius 值，
         而 XAML 的 double 类型转换器会把 `{DynamicResource RadiusSm}` 解析成裸 Double，
         控件在 Arrange 阶段抛 InvalidCastException。用属性语法声明即可复用 WPF 内建的
         CornerRadius 类型转换器。
     -->
-    <CornerRadius x:Key="RadiusSm">4</CornerRadius>
+    <!--
+        圆角刻度（P61-03，用户裁决「放开 8px 上限」）。
+        只保留两档 + 一档浮层，避免出现两个键同值却语义不同的混淆：
+          RadiusSm 10  —— 按钮、列表项、输入框等可交互控件
+          RadiusMd 6   —— 小组件内部（进度条、滑块轨道、勾选框）
+          RadiusLg 12  —— 卡片、面板、抬高表面
+          RadiusXl 16  —— 弹窗与浮层（下拉、上下文菜单、提示）
+    -->
+    <CornerRadius x:Key="RadiusSm">10</CornerRadius>
     <CornerRadius x:Key="RadiusMd">6</CornerRadius>
-    <CornerRadius x:Key="RadiusLg">8</CornerRadius>
+    <CornerRadius x:Key="RadiusLg">12</CornerRadius>
+    <CornerRadius x:Key="RadiusXl">16</CornerRadius>
 
     <!-- 字号：UI_DESIGN §2.1。正文沿用 UiBodyFontSize（14）。 -->
     <sys:Double x:Key="FontCaptionSize">12</sys:Double>
@@ -144,21 +171,70 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="ButtonBorder"
-                            Padding="{TemplateBinding Padding}"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{DynamicResource RadiusLg}">
-                        <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="ButtonBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{DynamicResource RadiusSm}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <!--
+                            P61-01 交互叠加层：覆盖整个按钮，只动自身 Opacity，
+                            因此既能做出过渡，又不影响底色与圆角裁切。
+                        -->
+                        <Border x:Name="ButtonTint"
+                                Background="{DynamicResource InteractionHoverBrush}"
+                                CornerRadius="{DynamicResource RadiusSm}"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <!--
+                                        值必须写字面量：DoubleAnimation.Duration / EasingFunction
+                                        不是依赖属性，DynamicResource/StaticResource 在此不生效。
+                                        字面量与 MotionFast(120ms) / EasingStandard(EaseInOut) 对齐，
+                                        由 MotionTokenContractTests 断言两者一致。
+                                    -->
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ButtonTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ButtonTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource PressedBrush}" />
+                            <!--
+                                只换叠加色，不设 Opacity：按下时 IsMouseOver 通常同时为真，
+                                由它驱动 0→1 的动画。若在此本地设值会「覆盖」动画，导致
+                                「按住后移出」时退出动画被压掉、叠加层卡在可见状态。
+                            -->
+                            <Setter TargetName="ButtonTint" Property="Background" Value="{DynamicResource InteractionPressedBrush}" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
@@ -179,20 +255,55 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="PrimaryButtonBorder"
-                            Padding="{TemplateBinding Padding}"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{DynamicResource RadiusLg}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="PrimaryButtonBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{DynamicResource RadiusSm}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <!-- 强调色底上用白色叠加：深色叠加会把蓝色压暗得失真。 -->
+                        <Border x:Name="PrimaryButtonTint"
+                                Background="{DynamicResource InteractionHoverLightBrush}"
+                                CornerRadius="{DynamicResource RadiusSm}"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="PrimaryButtonBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PrimaryButtonTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="PrimaryButtonTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="PrimaryButtonBorder" Property="Background" Value="{DynamicResource AccentPressedBrush}" />
+                            <Setter TargetName="PrimaryButtonTint" Property="Background" Value="{DynamicResource InteractionPressedLightBrush}" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="PrimaryButtonBorder" Property="BorderBrush" Value="{DynamicResource TextPrimaryBrush}" />
@@ -372,7 +483,7 @@
                             <Border Background="{DynamicResource SurfaceBrush}"
                                     BorderBrush="{DynamicResource BorderBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="{DynamicResource RadiusMd}"
+                                    CornerRadius="{DynamicResource RadiusXl}"
                                     Padding="4"
                                     MaxHeight="300"
                                     SnapsToDevicePixels="True">
@@ -524,7 +635,7 @@
                                 <Border Background="{DynamicResource SurfaceBrush}"
                                         BorderBrush="{DynamicResource BorderBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="{DynamicResource RadiusMd}"
+                                        CornerRadius="{DynamicResource RadiusXl}"
                                         Padding="4"
                                         SnapsToDevicePixels="True">
                                     <Calendar x:Name="PART_Calendar"
@@ -586,15 +697,49 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListBoxItem">
-                    <Border x:Name="ListItemBorder"
-                            Padding="{TemplateBinding Padding}"
-                            Background="Transparent"
-                            CornerRadius="{DynamicResource RadiusSm}">
-                        <ContentPresenter />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="ListItemBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="Transparent"
+                                CornerRadius="{DynamicResource RadiusSm}">
+                            <ContentPresenter />
+                        </Border>
+                        <Border x:Name="ListItemTint"
+                                Background="{DynamicResource InteractionHoverBrush}"
+                                CornerRadius="{DynamicResource RadiusSm}"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ListItemBorder" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ListItemTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ListItemTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="ListItemBorder" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
@@ -711,10 +856,42 @@
                                 CornerRadius="{DynamicResource RadiusSm}">
                             <ContentPresenter VerticalAlignment="Center" />
                         </Border>
+                        <Border x:Name="NavigationTint"
+                                Background="{DynamicResource InteractionHoverBrush}"
+                                CornerRadius="{DynamicResource RadiusSm}"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="NavigationTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="NavigationTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
@@ -900,7 +1077,7 @@
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{DynamicResource RadiusMd}"
+                            CornerRadius="{DynamicResource RadiusXl}"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <StackPanel IsItemsHost="True" />

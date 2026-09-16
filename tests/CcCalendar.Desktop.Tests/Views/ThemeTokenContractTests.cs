@@ -34,12 +34,13 @@ public sealed class ThemeTokenContractTests
         "SpacingXl",
     ];
 
-    /// <summary>圆角令牌，上限 8px（UI_DESIGN §2.2）。</summary>
+    /// <summary>圆角令牌（P61-03 放开 8px 上限后：控件 10 / 卡片 12 / 浮层 16）。</summary>
     private static readonly string[] RadiusTokens =
     [
         "RadiusSm",
         "RadiusMd",
         "RadiusLg",
+        "RadiusXl",
     ];
 
     /// <summary>字号令牌，UI_DESIGN §2.1。</summary>
@@ -173,7 +174,7 @@ public sealed class ThemeTokenContractTests
     }
 
     [Fact]
-    public void RadiusTokensStayWithinTheDocumentedEightPixelCeiling()
+    public void RadiusTokensStayWithinTheDocumentedCeiling()
     {
         RunOnThemeThread((light, _) =>
         {
@@ -188,9 +189,11 @@ public sealed class ThemeTokenContractTests
                     Math.Max(radius.TopLeft, radius.TopRight),
                     Math.Max(radius.BottomLeft, radius.BottomRight));
 
+                // P61-03：用户裁决放开原先的 8px 上限，改为 16（浮层档）。
+                // 上限仍要存在，避免后续随手写出 24/28 这类超出刻度的值。
                 Assert.True(
-                    maximum <= 8d,
-                    $"圆角令牌 '{key}' = {maximum}，超出 UI_DESIGN §2.2 的 8px 上限。");
+                    maximum <= 16d,
+                    $"圆角令牌 '{key}' = {maximum}，超出既定的 16px 上限（UI_DESIGN §2.2）。");
             }
         });
     }
@@ -311,9 +314,9 @@ public sealed class ThemeTokenContractTests
     /// </summary>
     private static readonly Dictionary<string, string> StructuralRadiusExemptions = new(StringComparer.Ordinal)
     {
-        ["3"] = "CheckBox 勾选框（16px 方框配 3px 圆角，无同值令牌）",
-        ["2"] = "ProgressBar / Slider 轨道 / 导航选中条（2px 细条结构尺寸，无同值令牌）",
-        ["5"] = "ScrollBar thumb（10px 宽 thumb 的圆角，无同值令牌）",
+        ["3"] = "CheckBox 勾选框 / ProgressBar 轨道（无同值令牌）",
+        ["2"] = "Slider 轨道 / 导航选中条（无同值令牌）",
+        ["5"] = "ScrollBar thumb（无同值令牌）",
     };
 
     [Fact]
@@ -322,7 +325,8 @@ public sealed class ThemeTokenContractTests
         string theme = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Themes", "Theme.xaml");
 
         // 设计与令牌同值的圆角必须改用令牌引用（替换后渲染值完全相同）。
-        foreach (string value in new[] { "4", "6", "8" })
+        // 刻度见 Theme.xaml：RadiusMd 6 / RadiusSm 10 / RadiusLg 12 / RadiusXl 16。
+        foreach (string value in new[] { "6", "10", "12", "16" })
         {
             Assert.True(
                 !theme.Contains($"CornerRadius=\"{value}\"", StringComparison.Ordinal),
@@ -359,12 +363,20 @@ public sealed class ThemeTokenContractTests
         }
     }
 
+    /// <summary>
+    /// 圆角值 → 应有的令牌名（P61-03 刻度）。
+    /// 用于在失败信息里指出该改用哪个令牌，因此必须与实际刻度一致。
+    /// </summary>
     private static string RadiusTokenFor(string value) => value switch
     {
-        "4" => "RadiusSm",
         "6" => "RadiusMd",
-        "8" => "RadiusLg",
-        _ => throw new ArgumentOutOfRangeException(nameof(value), value, "该值不在可令牌化范围内。"),
+        "10" => "RadiusSm",
+        "12" => "RadiusLg",
+        "16" => "RadiusXl",
+        _ => throw new ArgumentOutOfRangeException(
+            nameof(value),
+            value,
+            "该值不在圆角刻度（6/10/12/16）内，不应出现在可令牌化范围内。"),
     };
 
     private static void AssertTokensOfType<T>(ResourceDictionary dictionary, string[] keys, string category)

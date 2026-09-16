@@ -1080,6 +1080,34 @@ Verify：完整验证命令、结果、必要的人工检查
 | 2026-08-24 | 版本 0.4.14 发布：包含腾讯会议中文格式邀请解析和桌面组件“鼠标穿透”右键切换；重新生成 Windows x64 自包含安装包并上传 OSS | `eng\publish.cmd` 重跑成功；完整回归 438/438；安装器编译成功；SHA-256 `3E208D3D891EE20B760F8C3826E5C66CD43856F3E048143BA305834463000D10`；安装包 60,107,677 bytes；公网清单版本 0.4.14、SHA-256 匹配、安装包 HTTP 200 | 等待用户安装验收 |
 | 2026-08-24 | 腾讯会议邀请兼容“会议名称/中文年月日/会议地点/链接附会议号”格式；桌面组件右键菜单新增“鼠标穿透”切换 | Red：新增解析器、快速新增运行时和右键菜单测试先失败；Green：扩展解析正则并接入三个桌面组件的现有鼠标穿透控制；Verify：`eng\verify.cmd` 通过，Core 90/90、Desktop 209/209、Infrastructure 97/97、Server 42/42，0 警告/0 错误 | 待用户验收 |
 
+## P61 - UI 观感与动效（用户反馈「跟参考实现差太远」后的纠偏轮）
+
+> 背景：P60 六片全部完成后用户反馈"UI 完全没优化"。复盘确认根因——**P60 有 5 片是肉眼不可见的重构**（令牌基线、等价替换、文档），且我把参考实现最有视觉冲击力的部分（大圆角、柔和阴影、松留白）全划进了"拒绝"，守着自己 8 月的 8px 规范没动。更深层的差距不是数值：**项目此前 0 个 `@keyframes`、0 个 `Storyboard`、0 个 `VisualStateManager`，悬停/按下是瞬间跳变，也没有任何可复用微组件**（参考实现有 37 个 `@keyframes`、53 处 `animation`，外加 StateDot / ConnectionIndicator / spinner / skeleton / HoverCard / 复制反馈等）。
+
+- [x] P61-01 动效基础设施：交互叠加层 + 过渡令牌。
+  - 采纳参考实现的关键做法：**悬停/按下是带 alpha 的半透明叠加**（`rgba(38,49,72,0.06)` 浅 / `rgba(255,255,255,0.08)` 深），而不是不透明换色。新增 `InteractionHoverBrush`/`InteractionPressedBrush`（普通底色）与 `InteractionHoverLightBrush`/`InteractionPressedLightBrush`（强调色底上的白色叠加）。
+  - 实现取舍：叠加层只动画自己的 `Border.Opacity`。**不做 `Background` 换色动画**——换色方案在动画期间必须持有具体颜色，会丢掉 `DynamicResource` 引用，主题切换后动画目标失效。
+  - 新增 `Interactions\SmoothTint.cs` 集中登记令牌名与取值（供 XAML 与契约测试共用），避免字符串散落。
+  - 触发方式：模板触发器 `Trigger.EnterActions`/`ExitActions` + `Storyboard`。**踩坑**：`DoubleAnimation.Duration`/`EasingFunction` 不是依赖属性，`DynamicResource`/`StaticResource` 在此不生效，必须写字面量 `Duration="0:0:0.12"` + 内联 `CubicEase`；由 `MotionContractTests` 断言字面量与 `MotionFast`/`EasingStandard` 令牌一致，避免两处漂移。
+  - **踩坑（状态冲突）**：`IsPressed` 触发器最初同时设 `Opacity=1`，会本地"覆盖"动画，导致"按住后移出"时退出动画被压掉、叠加层卡在可见态。已改为 `IsPressed` 只换叠加色，位移交给 `IsMouseOver` 的动画。
+  - 接入范围：默认 `Button`、`PrimaryButtonStyle`、默认 `ListBoxItem`、`NavigationItemStyle`。
+  - 新增 `MotionContractTests`（5 项）：令牌存在且类型正确、叠加色在深浅两主题下都带 alpha、深色覆写普通叠加色且白色叠加确为白色、模板确实挂了 Enter/Exit 动画且旧的不透明换色写法已移除、以及**运行时断言动画真的会推进到目标值**（模板触发器无法被合成鼠标事件驱动，故用等时钟推进的方式覆盖"动画机制在本 WPF 环境可用"）。
+  - Verify：`eng\verify.cmd` 退出 0；build 0 警告 0 错误。
+
+- [x] P61-02 放开圆角上限并按刻度重排。
+  - 用户裁决：放开 `UI_DESIGN.md` §2.2 原有的 8px 上限。
+  - 新刻度：`RadiusSm` 10（按钮/输入/列表项）、`RadiusMd` 6（进度条/滑块轨道/勾选框等小组件内部）、`RadiusLg` 12（卡片/面板/抬高表面）、`RadiusXl` 16（弹窗、下拉、上下文菜单、提示）。**上限 16**，由契约测试断言，防止后续随手写出 24/28 这类超刻度值。
+  - 浮层从 `RadiusMd` 改指 `RadiusXl`：ComboBox 下拉、DatePicker 弹窗、ContextMenu。按钮与其叠加层统一改指 `RadiusSm`（保证叠加层圆角与底色一致，不露出直角）。
+  - 同步更新 `docs/UI_DESIGN.md` §2.2 与 §2.4 令牌表；契约测试中的 8px 上限断言改为 16px，并修正 `RadiusTokenFor` 映射表（上一版把 10/12/16 全映射到 `RadiusXl`，是错的占位实现）。
+  - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **507/507**（Core 93、Infrastructure 104、Desktop 266、Server 44）。
+
+- [ ] P61-03 微组件库：LoadingRing（加载环）、StateDot（状态点，带追逐动画）、ConnectionIndicator（连接状态，用在设置页团队连接）。参考实现里这三者都有独立动画，是"界面活起来"的主要来源。
+- [ ] P61-04 截图工具与效果对比图：仓库当前无 QA 截图脚本（`.gitignore` 排除了 `/qa*.ps1`），需补一个可持续使用的截图入口，输出"快速新增 + 设置页"的改动前后对比，作为观感效果证据。
+- [ ] P61-05 其余交互控件接入动效：`ComboBoxItem`、`TabItem`、`MenuItem`、`ToggleButton`（四处的悬停仍是瞬间换色）。
+- [ ] P61-06 留白与层级：按参考实现拉开控件高度与区块留白；评估"抬高表面改用 0.5px 描边 + 柔和阴影替代 1px 硬边框"（需先新增阴影令牌，当前主题 0 个阴影）。
+
+## P62 - 会议室看板与会议邀请工作流
+
 ## P19 - AI 助理体检后续（见 docs/ASSISTANT_WORKLIST.md）
 
 ## P60 - UI 优化（借鉴 deepseek-harness Web UI 设计语言）

@@ -43,6 +43,12 @@
     <SolidColorBrush x:Key="ElevationPanelBrush" Color="#22252A" />
     <SolidColorBrush x:Key="ElevationProminentBrush" Color="#2A2E34" />
 
+    <!-- 交互叠加色（P61-01）：深色下用白色叠加，alpha 与浅色对齐。 -->
+    <SolidColorBrush x:Key="InteractionHoverBrush" Color="#14FFFFFF" />
+    <SolidColorBrush x:Key="InteractionPressedBrush" Color="#24FFFFFF" />
+    <SolidColorBrush x:Key="InteractionHoverLightBrush" Color="#14FFFFFF" />
+    <SolidColorBrush x:Key="InteractionPressedLightBrush" Color="#24FFFFFF" />
+
     <!--
         Color: 会议室看板语义色覆写（P60-03）。
         深色下看板底色跟随主表面，状态色改为低亮度底 + 高亮度字，保证 4.5:1 以上对比度。

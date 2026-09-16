@@ -25,7 +25,7 @@
 - 基础间距：4、8、12、16、24 px。
 - 普通控件高度：32 px；紧凑工具栏：28 px；主要输入：36 px。
 - 图标按钮：32 x 32 px，图标 16 或 18 px，尺寸固定不随内容变化。
-- 圆角：输入和按钮 4 px；菜单、浮层和独立重复项 6 px；最大不超过 8 px。
+- 圆角：输入和按钮 10 px；菜单、浮层、独立重复项 12 px；弹窗与下拉 16 px。**上限 16 px**（2026-09-16 由用户裁决放开原 8 px 上限，以贴近参考实现的柔和观感）。
 - 侧栏宽度：192-216 px；详情编辑面板：360-440 px。
 
 ### 2.3 颜色
@@ -58,7 +58,7 @@
 
 **间距**（`sys:Double`）：`SpacingXs` 4、`SpacingSm` 8、`SpacingMd` 12、`SpacingLg` 16、`SpacingXl` 24。
 
-**圆角**（必须是 `CornerRadius` 类型，不能是 `sys:Double`——见 §11 的类型陷阱）：`RadiusSm` 4、`RadiusMd` 6、`RadiusLg` 8。
+**圆角**（必须是 `CornerRadius` 类型，不能是 `sys:Double`——见 §11 的类型陷阱）：`RadiusMd` 6（小组件内部：进度条、滑块轨道、勾选框）、`RadiusSm` 10（按钮、输入框、列表项）、`RadiusLg` 12（卡片、面板、抬高表面）、`RadiusXl` 16（弹窗、下拉、上下文菜单、提示）。上限 16。
 
 **字号**（`sys:Double`）：`FontCaptionSize` 12、`FontCompactSize` 13、`UiBodyFontSize` 14（正文）、`FontPanelTitleSize` 16、`FontPageTitleSize` 20、`FontClockSize` 32。
 
