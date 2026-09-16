@@ -1,4 +1,4 @@
-# cccalendar Worklist
+﻿# cccalendar Worklist
 
 > 本文件是跨会话续作的唯一进度入口。每完成一次 Red、Green、Refactor 或验证，都要立即更新对应条目和“当前检查点”。
 
@@ -12,6 +12,7 @@
   - 历史数据提示：本机 DB 中 3 条 TZ="Asia/Shanghai" 的"每日例会"（存为 10:10 UTC=北京 18:10）为 AI 误标 Z 产生的历史偏移数据，可选择删除或手动改期；新创建的日程已不受影响。
   - 完整回归：2026-09-16 `eng\verify.cmd` 通过，format check 通过、build 0 警告 0 错误、测试 479/479（Core 93、Infrastructure 104、Desktop 238、Server 44；基线 474 + 本轮新增 5）。
 - 2026-09-16：版本 0.6.6 安装包构建并发布完成（含上述 4 项 bug 修复 + 本机 settings.json `apiBaseUrl` 前导空格清理）：`eng\publish.cmd` 完整回归 479/479、Release 发布与启动冒烟通过；首次构建时发现 `installer\cccalendar.iss` 的 AppVersion 独立于 csproj（曾产出误命名的 0.6.5 包，已删除重编），两处版本号已同步为 0.6.6。产物 `artifacts\installer\cccalendar-0.6.6-win-x64-setup.exe` 60,145,895 bytes，SHA-256 `5EC5032FB95EAD42622E7F2115BE9ABBE5DBE6E6F92C63209026F38452C2371B`；已按 OSS_RELEASE_GUIDE 上传安装包与根目录 `version.json`（先包后清单），公网校验通过：清单返回 0.6.6、SHA-256 一致、安装包 HEAD 200 Content-Length 60,145,895。其他电脑可通过“检查更新”或重新安装升级。
+- 2026-09-16：**P61 UI 观感与动效轮全部完成（P61-01 ~ P61-06b）**。起因是用户反馈 P60 之后"UI 完全没优化，跟参考实现差太远"——复盘确认根因不是数值，而是**项目此前 0 个 @keyframes、0 个 Storyboard、悬停/按下瞬间跳变、且没有任何可复用微组件**（参考实现有 37 个 keyframes / 53 处 animation）。本轮成果：① 9 个交互控件全部改为**带过渡的半透明叠加**（不再瞬间换不透明底色）；② 圆角刻度放开到 10/12/16；③ 17 处卡片由 1px 硬边框改为极淡描边 + 柔和阴影（主题新增 2 档阴影令牌，此前 0 个）；④ 新增 3 个微组件（加载环 / 状态点 / 连接状态指示器）并接入设置页团队连接；⑤ 控件高度对齐 36px 档；⑥ 新建可复用截图工具 eng\capture-ui.ps1。新增 4 个测试类共 26 项契约与运行时断言。过程中修正 6 处自身缺陷与 1 处**假通过的视觉测试**，并修掉一个真实无障碍缺陷（导航项自动化名称回退到 ToString()）。当前完整回归 **514/514**（Core 93、Infrastructure 104、Desktop 273、Server 44），build 0 警告 0 错误，eng\verify.cmd 退出 0。截图证据在 artifacts/ui-shots/（浅/深 × 各页）。
 - 2026-09-16：**P60 UI 优化阶段全部完成（P60-01 ~ P60-06）**。成果：① 建立完整设计令牌层（间距/圆角/字号/控件尺寸/动效 + 语义画刷，深色字典同步覆写）；② `Theme.xaml` 可令牌化字面量全部归位；③ **会议室看板主题化——深色主题下不再白底**，桌面组件自动跟随其主题/颜色设置；④ 看板文字对比度全部达 WCAG AA（修掉浅色 4.41:1 的不达标项），本人占用加 3px 标记条使本人/他人不只靠颜色区分；⑤ 12 处内联页面标题归位 `PageTitleStyle`，助理导航去掉星光图标，遮罩令牌化；⑥ 看板浅/深双主题截图人工核验通过，`UI_DESIGN.md`/`USER_GUIDE.md` 已同步。新增 4 个测试文件/类共 23 项测试。过程中修正 4 处自身缺陷（圆角令牌类型、令牌键后缀、调色板默认值、截图偏移），并识别出 1 个**假通过**的视觉测试。当前完整回归 **502/502**（Core 93、Infrastructure 104、Desktop 261、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。遗留：约 20 处 `FontSize="11"` 未归入字号阶梯（属观感变更，需单独一轮 + 三档分辨率逐页截图）。
 - 2026-09-16：**P60-05 页面字面量清理完成**。实测共 12 处页面标题内联 `FontSize="20"+SemiBold`（比方案初版预估的 3 处多，含 `MainWindow` 工作区占位标题、`CalendarView` 日期标题、`SettingsView` 五个页签标题），全部改用 `PageTitleStyle`；助理导航 `Sparkles → Bot`（UI_DESIGN §1.6 禁止星光图标）；`RegionSelectorWindow` 遮罩改用 `OverlayScrimBrush`；两个会议窗口标题改用 `SectionTitleStyle`。刻意放行 2 处并注明理由：`TodayView` 天气大标题（非页面标题）、区域选择器的白色选框。新增 3 项源码契约测试。完整回归 **501/501**（Core 93、Infrastructure 104、Desktop 260、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。下一片 P60-06（三档分辨率 × 浅深主题视觉验收 + 文档同步）。遗留：页面内约 20 处 `FontSize="11"` 未批量替换（11→12px 属观感变更，留待 P60-06 评估）。
 - 2026-09-16：**P60-04 看板可读性与状态表达完成**。新增 `ColorContrast`（WCAG 2.1）并逐对实测，发现浅色「他人占用」文字对比度仅 **4.41:1**（低于 AA 的 4.5:1），改为 `#5C6470` 后达 4.82:1；本人占用块新增左侧 3px 标记条（与导航选中项同一语法），使「本人/他人」不只靠颜色区分；标签字号由硬编码 11px 改为 12px 并对齐 `FontCaptionSize` 档位。新增 4 项测试（对比度 8 对、标记条独立性、字号档位、标记条宽度）。完整回归 **498/498**（Core 93、Infrastructure 104、Desktop 257、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。下一片 P60-05（页面字面量清理）。
@@ -56,7 +57,7 @@
 - 最近验证：2026-08-23，`eng\verify.cmd` 通过，完整回归 414/414（Core 88、Infrastructure 93、Desktop 191、Server 42），build 0 警告/0 错误；本轮未重新生成或上传安装包。
 - 2026-08-23：更新图标改用蓝色 `PrimaryButtonStyle`，保持新版本可用时清晰可见；快速新增窗口改为非模态 `Show()`，创建/取消使用显式 `Close()`，关闭后异步保存请求并防止重复打开。
 - 最近验证：2026-08-23，`eng\verify.cmd` 通过，完整回归 414/414（Core 88、Infrastructure 93、Desktop 191、Server 42），build 0 警告/0 错误；本轮未重新生成安装包。
-- 唯一下一步（2026-09-16 起）：**P60 UI 优化阶段已全部完成，等待用户查看效果并提意见**。截图证据在 `artifacts\ui-p60\`（`room-board-light.png`/`room-board-dark.png`）。后续可选：① 把约 20 处 `FontSize="11"` 归入字号阶梯（需三档分辨率逐页截图验收）；② 处理方案文档 §9 记录的 8 处文档陈旧/矛盾问题（`DESIGN.md` 头部、`AUTO_UPDATE_DESIGN.md` 版本号、`USER_GUIDE - 副本.md` 等）。长期并行事项：P15-09d 两地云端验收、生产 HTTPS/OIDC（P47）。本轮无阻塞项。
+- 唯一下一步（2026-09-16 起）：**P60 与 P61 两轮 UI 工作均已完成，等待用户查看效果并提意见**。截图证据在 `artifacts/ui-shots/`（浅/深双主题），截图工具 `eng\capture-ui.ps1 -Mode Dark -Size 1366x768 -Isolated`。后续可选：① 把约 20 处 `FontSize="11"` 归入字号阶梯；② View 级区块间距重排（逐页切片 + 截图对比）；③ 处理方案文档 §9 记录的 8 处文档陈旧/矛盾问题。长期并行：P15-09d 两地云端验收、生产 HTTPS/OIDC（P47）。
 
 - 当前阶段：P16 快速新增/看板/桌面组件增强（P16-04~07 完成）
 - 当前状态：P16 已发布，后续云端验收与生产 HTTPS/OIDC 仍是长期事项；本轮 P18 变更已在上方检查点记录。
@@ -1110,8 +1111,6 @@ Verify：完整验证命令、结果、必要的人工检查
   - 排障记录：批量替换时先按「`BorderBrush` 与 `BorderThickness` 同一行」匹配，结果 16 处全部跳过——实际 XAML 里两者**分别占一行**；改用「`BorderBrush` 行的下一行是 `BorderThickness="1"`」后命中。随后人工核对背景色，发现并回退了 4 处误改（3 个状态标记 + 1 个含拖放区的勾选框）。
   - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **507/507**（Core 93、Infrastructure 104、Desktop 266、Server 44）。
 
-- [ ] P61-03 微组件库：LoadingRing（加载环）、StateDot（状态点，带追逐动画）、ConnectionIndicator（连接状态，用在设置页团队连接）。参考实现里这三者都有独立动画，是"界面活起来"的主要来源。
-- [ ] P61-04 截图工具与效果对比图：仓库当前无 QA 截图脚本（`.gitignore` 排除了 `/qa*.ps1`），需补一个可持续使用的截图入口，输出"快速新增 + 设置页"的改动前后对比，作为观感效果证据。
 - [x] P61-04 截图工具与效果核验。
   - 新增 `eng\capture-ui.ps1`：启动真实应用实例（`-Isolated` 时用 `CCCALENDAR_HOME` 指向 `artifacts/ui-shots/home`，不触碰本机数据），设置主题与窗口尺寸，用 UI Automation 的 `SelectionItemPattern` 逐页切换并截图到 `artifacts/ui-shots/`。仓库此前**没有任何截图工具**（`.gitignore` 排除了 `/qa*.ps1`），而 UI_DESIGN §9 要求按分辨率验收，故补此入口。
   - 已产出浅色与深色各 9 页（1366×768），文件名形如 `statistics-dark-1366x768.png`。
@@ -1148,7 +1147,6 @@ Verify：完整验证命令、结果、必要的人工检查
     - 教训：**全局尺寸令牌的改动会命中所有 `Auto` 行/列，必须用测试验证，而不是只看截图**。截图显示设置页与工具页都正常，这个回归只有自动化测试能发现。
   - 未在本切片做的部分（明确记录）：`View` 级的区块间距（`Margin="24,20,24,28"` 这类）未逐一重排。逐页调整 28 个文件的间距属于高回归风险、低可验证性的工作，且截图显示当前各页留白已可接受；若后续仍需调整，应逐页单独切片并用截图对比。
   - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **514/514**（Core 93、Infrastructure 104、Desktop 273、Server 44）。
-- [ ] P61-06 留白与层级：按参考实现拉开控件高度与区块留白；评估"抬高表面改用 0.5px 描边 + 柔和阴影替代 1px 硬边框"（需先新增阴影令牌，当前主题 0 个阴影）。
 
 ## P62 - 会议室看板与会议邀请工作流
 
