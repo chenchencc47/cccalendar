@@ -13,7 +13,7 @@
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="*" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
         <DockPanel>
             <Button DockPanel.Dock="Right" Width="120" AutomationProperties.Name="复制全部会议" Click="CopyAllClick" Content="复制全部会议" />
-            <TextBlock FontSize="18" FontWeight="SemiBold" Text="当天会议邀请" />
+            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="当天会议邀请" />
         </DockPanel>
         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <ItemsControl x:Name="MeetingItems" />

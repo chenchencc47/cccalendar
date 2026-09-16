@@ -69,7 +69,7 @@
                         Command="{Binding RestoreDefaultsCommand}"
                         Content="恢复当前默认" />
                 <StackPanel>
-                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="桌面外观" />
+                    <TextBlock Style="{StaticResource PageTitleStyle}" Text="桌面外观" />
                 </StackPanel>
             </DockPanel>
 
@@ -313,7 +313,7 @@
         <TabItem Header="全局快捷键">
             <Grid Margin="24,20,32,32" MaxWidth="920" HorizontalAlignment="Left" DataContext="{Binding Shortcuts}">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                <TextBlock FontSize="20" FontWeight="SemiBold" Text="全局快捷键" />
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="全局快捷键" />
                 <TextBlock Grid.Row="1"
                            Margin="0,8,0,0"
                            Foreground="{DynamicResource TextSecondaryBrush}"
@@ -353,7 +353,7 @@
         <TabItem Header="提醒">
             <Grid Margin="24,20,32,32" MaxWidth="920" HorizontalAlignment="Left" DataContext="{Binding ReminderNotifications}">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                <TextBlock FontSize="20" FontWeight="SemiBold" Text="提醒" />
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="提醒" />
                 <StackPanel Grid.Row="1" Margin="0,18,0,0">
                     <TextBlock Margin="0,0,0,8" FontSize="16" FontWeight="SemiBold" Text="通知方式" />
                     <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
@@ -432,7 +432,7 @@
                     <RowDefinition Height="20" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <TextBlock FontSize="20" FontWeight="SemiBold" Text="AI 模型" />
+                <TextBlock Style="{StaticResource PageTitleStyle}" Text="AI 模型" />
                 <StackPanel Grid.Row="2">
                     <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
                         <Grid MinHeight="52">
@@ -584,7 +584,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <TextBlock FontSize="20" FontWeight="SemiBold" Text="团队连接" />
+                    <TextBlock Style="{StaticResource PageTitleStyle}" Text="团队连接" />
                     <TextBlock Grid.Row="1" Margin="0,8,0,18" Foreground="{DynamicResource TextSecondaryBrush}" Text="登录后可读取团队会议室并在线预约。令牌保存在 Windows 凭据管理器。未填写 OIDC 地址时，用“开发令牌姓名”直接登录（服务器需启用开发令牌模式）。" TextWrapping="Wrap" />
                     <Grid Grid.Row="2">
                         <Grid.RowDefinitions>

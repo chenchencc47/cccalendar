@@ -9,7 +9,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <DockPanel>
-            <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="记录" />
+            <TextBlock VerticalAlignment="Center" Style="{StaticResource PageTitleStyle}" Text="记录" />
             <Button DockPanel.Dock="Right" HorizontalAlignment="Right" Click="CreateRecordClick" Style="{StaticResource PrimaryButtonStyle}">
                 <StackPanel Orientation="Horizontal">
                     <iconPacks:PackIconLucide Width="16" Height="16" Kind="Plus" />

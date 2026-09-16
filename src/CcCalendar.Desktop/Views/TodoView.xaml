@@ -183,7 +183,7 @@
                 <ColumnDefinition Width="16" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="待办" />
+            <TextBlock VerticalAlignment="Center" Style="{StaticResource PageTitleStyle}" Text="待办" />
             <TextBox x:Name="NewTodoBox"
                      Grid.Column="2"
                      Height="32"

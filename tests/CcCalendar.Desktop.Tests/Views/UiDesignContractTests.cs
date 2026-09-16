@@ -495,6 +495,96 @@ public sealed class UiDesignContractTests
             StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// P60-05：页面标题必须复用 <c>PageTitleStyle</c>，不能在页面内重新定义同义尺寸。
+    ///
+    /// UI_DESIGN §10 要求「页面标题、区块标题、辅助文字和图标按钮分别复用
+    /// PageTitleStyle/SectionTitleStyle/CaptionTextStyle/IconButtonStyle」。
+    /// 修复前有 10 处页面标题直接写 <c>FontSize="20" FontWeight="SemiBold"</c>，
+    /// 一旦令牌调整，这些位置会与规范漂移。
+    /// </summary>
+    [Fact]
+    public void PageTitlesUseTheSharedStyleInsteadOfInlineLiterals()
+    {
+        string[] views =
+        [
+            "MainWindow.xaml",
+            "QuickAddWindow.xaml",
+            "QuickPanelWindow.xaml",
+            "EventEditWindow.xaml",
+            "MeetingDetailsWindow.xaml",
+            "MeetingExportWindow.xaml",
+            "DayScheduleWindow.xaml",
+            "DesktopComponentWindow.xaml",
+            "DesktopWorkbenchWindow.xaml",
+            "Views/AssistantView.xaml",
+            "Views/CalendarView.xaml",
+            "Views/ProjectView.xaml",
+            "Views/RecordView.xaml",
+            "Views/SettingsView.xaml",
+            "Views/StatisticsView.xaml",
+            "Views/TodayView.xaml",
+            "Views/TodoView.xaml",
+            "Views/ToolsView.xaml",
+        ];
+
+        var offenders = new List<string>();
+        foreach (string view in views)
+        {
+            string[] segments = ["src", "CcCalendar.Desktop", .. view.Split('/')];
+            string content = ReadWorkspaceFile(segments);
+            string fileName = segments[^1];
+
+            foreach (System.Text.RegularExpressions.Match match in
+                System.Text.RegularExpressions.Regex.Matches(
+                    content,
+                    "<TextBlock[^>]*FontSize=\"20\"[^>]*FontWeight=\"SemiBold\"[^>]*>",
+                    System.Text.RegularExpressions.RegexOptions.Singleline))
+            {
+                string literal = match.Value;
+
+                // 天气摘要用时钟级字号，是刻意的非页面标题用法（UI_DESIGN §2.1
+                // 允许时钟与天气标题使用较大字号），显式放行。
+                if (literal.Contains("Weather.CurrentSummary", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                offenders.Add($"{fileName}: {literal.Trim()}");
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            "以下页面标题未复用 PageTitleStyle，而是内联了 FontSize=\"20\"+SemiBold：\n"
+                + string.Join("\n", offenders));
+    }
+
+    /// <summary>
+    /// P60-05：助理导航不得使用星光图标（UI_DESIGN §1.6「AI 降权：不使用星光图标」）。
+    /// </summary>
+    [Fact]
+    public void AssistantNavigationAvoidsSparkleIconography()
+    {
+        string navigation = ReadWorkspaceFile(
+            "src", "CcCalendar.Desktop", "ViewModels", "MainWindowViewModel.cs");
+
+        Assert.DoesNotContain("PackIconLucideKind.Sparkles", navigation, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// P60-05：区域选择遮罩必须走主题令牌而不是硬编码半透明黑。
+    /// </summary>
+    [Fact]
+    public void RegionSelectorScrimUsesTheThemeToken()
+    {
+        string regionSelector = ReadWorkspaceFile(
+            "src", "CcCalendar.Desktop", "RegionSelectorWindow.xaml");
+
+        Assert.DoesNotContain("#33000000", regionSelector, StringComparison.Ordinal);
+        Assert.Contains("OverlayScrimBrush", regionSelector, StringComparison.Ordinal);
+    }
+
     private static string ReadWorkspaceFile(params string[] segments)
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

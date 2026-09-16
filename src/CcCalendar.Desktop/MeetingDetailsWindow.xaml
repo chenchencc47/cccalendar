@@ -11,7 +11,7 @@
         WindowStartupLocation="CenterOwner">
     <Grid Margin="20">
         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-        <TextBlock x:Name="TitleText" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock x:Name="TitleText" Style="{StaticResource SectionTitleStyle}" TextWrapping="Wrap" />
         <TextBlock x:Name="MetaText" Grid.Row="1" Margin="0,8,0,12" Foreground="{DynamicResource TextSecondaryBrush}" />
         <TextBox x:Name="InvitationText" Grid.Row="2" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" />
         <StackPanel Grid.Row="3" Margin="0,12,0,0" Orientation="Horizontal" HorizontalAlignment="Right">

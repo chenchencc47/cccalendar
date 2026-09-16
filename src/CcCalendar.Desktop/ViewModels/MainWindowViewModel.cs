@@ -23,7 +23,7 @@ public sealed class MainWindowViewModel : ObservableObject
             new(NavigationDestination.Projects, "项目", PackIconLucideKind.FolderKanban),
             new(NavigationDestination.Todos, "待办", PackIconLucideKind.ListChecks),
             new(NavigationDestination.Records, "记录", PackIconLucideKind.NotebookPen),
-            new(NavigationDestination.Assistant, "助理", PackIconLucideKind.Sparkles),
+            new(NavigationDestination.Assistant, "助理", PackIconLucideKind.Bot),
             new(NavigationDestination.Statistics, "统计", PackIconLucideKind.ChartNoAxesColumnIncreasing),
             new(NavigationDestination.Tools, "工具", PackIconLucideKind.Wrench),
             new(NavigationDestination.Settings, "设置", PackIconLucideKind.Settings),

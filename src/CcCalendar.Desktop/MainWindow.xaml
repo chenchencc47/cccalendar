@@ -255,8 +255,7 @@
                         </Style>
                     </StackPanel.Style>
                     <TextBlock HorizontalAlignment="Center"
-                               FontSize="20"
-                               FontWeight="SemiBold"
+                               Style="{StaticResource PageTitleStyle}"
                                Text="{Binding SelectedPageTitle}" />
                     <TextBlock Margin="0,8,0,0"
                                Foreground="{DynamicResource TextSecondaryBrush}"

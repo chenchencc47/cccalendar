@@ -27,8 +27,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <TextBlock VerticalAlignment="Center"
-                       FontSize="20"
-                       FontWeight="SemiBold"
+                       Style="{StaticResource PageTitleStyle}"
                        Text="{Binding DisplayTitle}" />
             <Button Grid.Column="2"
                     Width="28"

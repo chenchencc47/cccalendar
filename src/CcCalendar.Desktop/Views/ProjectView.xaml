@@ -9,7 +9,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <DockPanel>
-            <TextBlock VerticalAlignment="Center" FontSize="20" FontWeight="SemiBold" Text="项目" />
+            <TextBlock VerticalAlignment="Center" Style="{StaticResource PageTitleStyle}" Text="项目" />
             <Button DockPanel.Dock="Right"
                     HorizontalAlignment="Right"
                     Click="CreateProjectClick"
