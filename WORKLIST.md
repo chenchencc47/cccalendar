@@ -4,10 +4,10 @@
 
 | 项 | 值 |
 |----|-----|
-| 当前发布版本 | `0.6.6`（以 `version.json` 为准） |
+| 当前发布版本 | `0.6.7`（以 `version.json` 为准） |
 | 最后更新 | 2026-09-16 |
 | 测试基线 | **521/521**（Core 93、Infrastructure 104、Desktop 280、Server 44）；`eng\verify.cmd` 退出 0，build 0 警告 0 错误 |
-| 当前阶段 | P0–P17、P23–P27 团队会议室协作、P60/P61/P62 UI 观感与动效、P63 文档与安全清理、P64 桌面组件字号跟随缩放、P65 页面级留白统一 —— **均已完成并发布** |
+| 当前阶段 | P0–P17、P23–P27 团队会议室协作、P60/P61/P62 UI 观感与动效、P63 文档与安全清理、P64 桌面组件字号跟随缩放、P65 页面级留白统一、P66 0.6.7 发布 —— **均已完成并发布** |
 | 阻塞项 | 无 |
 | 安全状态 | 明文口令与密钥已从当前跟踪树移除；**轮换由用户决定暂缓，作为已知并接受的风险记录**（见「安全事项」） |
 
@@ -1183,6 +1183,16 @@ Verify：完整验证命令、结果、必要的人工检查
   - 未在本切片做的部分（明确记录）：`View` 级的区块间距（`Margin="24,20,24,28"` 这类）未逐一重排。逐页调整 28 个文件的间距属于高回归风险、低可验证性的工作，且截图显示当前各页留白已可接受；若后续仍需调整，应逐页单独切片并用截图对比。
   - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **514/514**（Core 93、Infrastructure 104、Desktop 273、Server 44）。
 
+## P66 - 0.6.7 发布
+
+- [x] P66 构建并发布 0.6.7 安装包，上传 OSS 并完成公网校验。
+  - 版本三处同步递增：`CcCalendar.Desktop.csproj` `<Version>`、`installer\cccalendar.iss` `AppVersion`、根 `version.json` —— 均 0.6.6 → **0.6.7**。（历史教训：这两处版本号相互独立，曾产出误命名的安装包，故每次都要核对。）
+  - 流水线：`eng\publish.cmd` 退出 0 —— 全量回归 **521/521**、Release 自包含 win-x64 发布、启动冒烟、Inno Setup 编译成功。另单独复跑 `eng\verify.cmd` 确认 521/521、0 警告 0 错误。
+  - 产物：`artifacts\installer\cccalendar-0.6.7-win-x64-setup.exe`，**60,155,693 bytes**，SHA-256 `B0BA1278FA3B9AB9BA136CCB0BC675DB75CB5312886017AB108B7CA2A6D3C23A`。
+  - 上传按 OSS_RELEASE_GUIDE 的**先安装包、后清单**顺序（避免客户端读到清单却下不到包）。公网校验通过：清单 `version=0.6.7`、`sha256` 与本地一致、安装包 `HEAD 200` 且 `ContentLength` 60,155,693 与本地一致。
+  - **服务端未重新部署，且不需要**：`git diff 0301307..HEAD -- src/CcCalendar.Server src/CcCalendar.Core src/CcCalendar.Infrastructure` 为空——0.6.6 之后全部改动都在 Desktop（主题、控件、视图、发布配置）。因此阿里云 ECS 上的 `cccalendar` 服务与 `data` 目录保持原样，无需停服、无需备份/恢复数据目录（避免了无谓的操作风险）。
+  - 提示：用户当前机器上装的是旧版；打开应用后「设置 → 桌面外观 → 应用更新 → 检查更新」应提示 0.6.7，确认后会自动下载、校验 SHA-256、退出、安装并重启。
+  - Verify：`eng\verify.cmd` 退出 0；build 0 警告 0 错误；`eng\publish.cmd` 退出 0；公网清单与安装包 HEAD/长度/哈希三项一致。
 ## P65 - 页面级留白统一（View 级间距重排的落地形态）
 
 - [x] P65 统一页面级留白。
