@@ -366,6 +366,84 @@ public sealed class RoomBookingPickerRuntimeTests
         });
     }
 
+    /// <summary>
+    /// P60-03：看板必须跟随主题换色。
+    ///
+    /// 修复前看板把 18 个颜色硬编码为冻结画刷，深色主题下仍是白底。这里在窗口上先挂好
+    /// 深色字典再建看板，断言网格底面像素是深色——这是「看板真正读了主题令牌」的直接证据，
+    /// 令牌存在与否不足以说明问题。
+    /// </summary>
+    [Fact]
+    public void BoardSurfaceFollowsTheActiveTheme()
+    {
+        RunOnSta(() =>
+        {
+            // 先把深色字典挂到窗口上，再构建并显示看板，避免依赖重绘时序。
+            var window = new Window { Width = 722, Height = 627, ShowInTaskbar = false };
+            window.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri("pack://application:,,,/cccalendar;component/Themes/DarkTheme.xaml"),
+            });
+
+            var picker = new RoomBookingPicker();
+            picker.Initialize(
+                DateOnly.Parse("2026-08-20", Invariant),
+                _ => Array.Empty<CalendarEvent>(),
+                TimeZoneInfo.Local);
+            window.Content = picker;
+            try
+            {
+                window.Show();
+                DoEvents(window);
+
+                RoomBookingBoardControl board = picker.Board;
+                Assert.True(board.ActualWidth > 0 && board.ActualHeight > 0, "看板应完成布局。");
+
+                // 取样点：第一个会议室列水平中心、8:30–9:00 格中间（避开网格线与表头）。
+                int sampleX = (int)Math.Round(RoomBookingBoardControl.RoomWidth / 2);
+                int sampleY = (int)Math.Round(
+                    (RoomBookingBoardControl.CellHeight / 2) + RoomBookingBoardControl.CellHeight);
+
+                Color darkSurface = RenderBoardPixel(board, sampleX, sampleY);
+
+                int darkLuma = Luma(darkSurface);
+                Assert.True(
+                    darkLuma < 120,
+                    $"深色主题下看板底面应足够暗，实际 luma={darkLuma}（{darkSurface}）；"
+                        + $"board.TryFindResource={board.TryFindResource("RoomBoardGridSurfaceBrush")}");
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    /// <summary>
+    /// 把 <paramref name="board"/> 自身重新渲染并取一个像素。
+    ///
+    /// 关键点：换主题后必须让 WPF 真正重绘一次（InvalidateVisual 只是标记失效），
+    /// 并把渲染队列跑完之后再 Render(board)。否则 Render 会拿到缓存的旧内容；
+    /// VisualBrush 尤其明显——它会直接复用已有的 bitmap cache。
+    /// </summary>
+    private static Color RenderBoardPixel(RoomBookingBoardControl board, int x, int y)
+    {
+        // 走一遍布局 → 渲染优先级队列，确保 InvalidateVisual 的标记被真正消费。
+        board.InvalidateVisual();
+        board.UpdateLayout();
+        board.Dispatcher.Invoke(DispatcherPriority.Background, () => { });
+        board.Dispatcher.Invoke(DispatcherPriority.Render, () => { });
+
+        int width = (int)Math.Ceiling(board.ActualWidth);
+        int height = (int)Math.Ceiling(board.ActualHeight);
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(board);
+        return GetPixel(bitmap, x, y);
+    }
+
+    private static int Luma(Color color)
+        => ((color.R * 299) + (color.G * 587) + (color.B * 114)) / 1000;
+
     private static Color GetPixel(BitmapSource bitmap, int x, int y)
     {
         var pixels = new byte[4];

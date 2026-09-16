@@ -42,4 +42,22 @@
     <SolidColorBrush x:Key="OverlayScrimBrush" Color="#66000000" />
     <SolidColorBrush x:Key="ElevationPanelBrush" Color="#22252A" />
     <SolidColorBrush x:Key="ElevationProminentBrush" Color="#2A2E34" />
+
+    <!--
+        Color: 会议室看板语义色覆写（P60-03）。
+        深色下看板底色跟随主表面，状态色改为低亮度底 + 高亮度字，保证 4.5:1 以上对比度。
+    -->
+    <SolidColorBrush x:Key="RoomBoardGridSurfaceBrush" Color="#22252A" />
+    <SolidColorBrush x:Key="RoomBoardGridHourBrush" Color="#383D45" />
+    <SolidColorBrush x:Key="RoomBoardGridHalfHourBrush" Color="#2C3038" />
+    <SolidColorBrush x:Key="RoomBoardOccupiedFillBrush" Color="#2F333A" />
+    <SolidColorBrush x:Key="RoomBoardOccupiedTextBrush" Color="#A8AFB8" />
+    <SolidColorBrush x:Key="RoomBoardOwnedFillBrush" Color="#1C2A38" />
+    <SolidColorBrush x:Key="RoomBoardOwnedTextBrush" Color="#8FB8F0" />
+    <SolidColorBrush x:Key="RoomBoardSelectedFreeFillBrush" Color="#1C3A2A" />
+    <SolidColorBrush x:Key="RoomBoardSelectedFreeTextBrush" Color="#7FCFA2" />
+    <SolidColorBrush x:Key="RoomBoardConflictFillBrush" Color="#3A2026" />
+    <SolidColorBrush x:Key="RoomBoardConflictTextBrush" Color="#F09AA5" />
+    <SolidColorBrush x:Key="RoomBoardHandleFillBrush" Color="#22252A" />
+    <SolidColorBrush x:Key="RoomBoardPreviewFillBrush" Color="#335794E6" />
 </ResourceDictionary>

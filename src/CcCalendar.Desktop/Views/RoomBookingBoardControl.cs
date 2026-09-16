@@ -42,24 +42,72 @@ public sealed class RoomBookingBoardControl : FrameworkElement
 
     private static readonly CultureInfo ChineseCulture = CultureInfo.GetCultureInfo("zh-CN");
 
-    private static readonly Brush GridHalfHourBrush = CreateFrozenBrush("#FFFFFF");
-    private static readonly Pen GridHourPen = CreateFrozenPen("#D9DEE5");
-    private static readonly Pen GridHalfHourPen = CreateFrozenPen("#F0F2F5");
-    private static readonly Pen RoomBorderPen = CreateFrozenPen("#D9DEE5");
-    private static readonly Brush OccupiedFillBrush = CreateFrozenBrush("#E4E7EA");
-    private static readonly Brush OccupiedTextBrush = CreateFrozenBrush("#626A75");
-    private static readonly Brush OwnedFillBrush = CreateFrozenBrush("#DCEBFF");
-    private static readonly Brush OwnedTextBrush = CreateFrozenBrush("#174A8B");
-    private static readonly Brush SelectedFreeFillBrush = CreateFrozenBrush("#D8F0DF");
-    private static readonly Pen SelectedFreeBorderPen = CreateFrozenPen("#2E7D4F");
-    private static readonly Brush SelectedFreeTextBrush = CreateFrozenBrush("#1F5B3A");
-    private static readonly Brush SelectedConflictFillBrush = CreateFrozenBrush("#F9E0E3");
-    private static readonly Pen SelectedConflictBorderPen = CreateFrozenPen("#C43D4B");
-    private static readonly Brush SelectedConflictTextBrush = CreateFrozenBrush("#8F2231");
-    private static readonly Brush HandleFillBrush = CreateFrozenBrush("#FFFFFF");
-    private static readonly Pen HandleBorderPen = CreateFrozenPen("#246BCE");
-    private static readonly Brush PreviewFillBrush = CreateFrozenBrush("#33246BCE");
-    private static readonly Pen PreviewBorderPen = CreateFrozenPen("#246BCE");
+    private RoomBoardPalette palette = RoomBoardPalette.Light;
+    private RoomBoardBrushes? brushes;
+
+    /// <summary>
+    /// 按当前主题解析看板色板，并丢弃缓存画刷。
+    ///
+    /// 资源查找从本控件向上走视觉树，因此必须在控件已挂到窗口之后调用才能读到
+    /// 窗口级覆写（桌面组件的外观设置就是这样注入的）。找不到键时
+    /// <see cref="RoomBoardPalette.WithResolved"/> 保留默认色，不会画出空色。
+    /// </summary>
+    public void RefreshPalette()
+    {
+        RoomBoardPalette resolved = RoomBoardPalette.Light.WithResolved(ResolvePaletteColor);
+        if (resolved != palette || brushes is null)
+        {
+            palette = resolved;
+            brushes = null;
+            InvalidateVisual();
+        }
+    }
+
+    private Color? ResolvePaletteColor(string key)
+        => TryFindResource(key) is SolidColorBrush brush ? brush.Color : null;
+
+    private RoomBoardBrushes Brushes => brushes ??= CreateBrushes(palette);
+
+    private static RoomBoardBrushes CreateBrushes(RoomBoardPalette source) => new(
+        GridSurface: CreateFrozenBrush(source.GridSurface),
+        GridHour: CreateFrozenPen(source.GridHour),
+        GridHalfHour: CreateFrozenPen(source.GridHalfHour),
+        RoomBorder: CreateFrozenPen(source.GridHour),
+        OccupiedFill: CreateFrozenBrush(source.OccupiedFill),
+        OccupiedText: CreateFrozenBrush(source.OccupiedText),
+        OwnedFill: CreateFrozenBrush(source.OwnedFill),
+        OwnedText: CreateFrozenBrush(source.OwnedText),
+        SelectedFreeFill: CreateFrozenBrush(source.SelectedFreeFill),
+        SelectedFreeBorder: CreateFrozenPen(source.SelectedFreeText),
+        SelectedFreeText: CreateFrozenBrush(source.SelectedFreeText),
+        ConflictFill: CreateFrozenBrush(source.ConflictFill),
+        ConflictBorder: CreateFrozenPen(source.ConflictText),
+        ConflictText: CreateFrozenBrush(source.ConflictText),
+        HandleFill: CreateFrozenBrush(source.HandleFill),
+        HandleBorder: CreateFrozenPen(source.SelectedFreeText),
+        PreviewFill: CreateFrozenBrush(source.PreviewFill),
+        PreviewBorder: CreateFrozenPen(source.SelectedFreeText));
+
+    /// <summary>看板绘制用的画刷与画笔，由 <see cref="RoomBoardPalette"/> 派生。</summary>
+    private sealed record RoomBoardBrushes(
+        Brush GridSurface,
+        Pen GridHour,
+        Pen GridHalfHour,
+        Pen RoomBorder,
+        Brush OccupiedFill,
+        Brush OccupiedText,
+        Brush OwnedFill,
+        Brush OwnedText,
+        Brush SelectedFreeFill,
+        Pen SelectedFreeBorder,
+        Brush SelectedFreeText,
+        Brush ConflictFill,
+        Pen ConflictBorder,
+        Brush ConflictText,
+        Brush HandleFill,
+        Pen HandleBorder,
+        Brush PreviewFill,
+        Pen PreviewBorder);
 
     private RoomBookingBoard? board;
     private IReadOnlyList<RoomOccupiedBlock> occupiedBlocks = [];
@@ -106,6 +154,10 @@ public sealed class RoomBookingBoardControl : FrameworkElement
         {
             return;
         }
+
+        // 读到窗口级主题令牌后再画：桌面组件的外观设置就是这样注入到窗口资源的，
+        // 因此必须在渲染时解析而不是在构造时固定。
+        RefreshPalette();
 
         DrawGrid(drawingContext, width, height);
         DrawOccupiedBlocks(drawingContext);
@@ -363,16 +415,16 @@ public sealed class RoomBookingBoardControl : FrameworkElement
 
     private void DrawGrid(DrawingContext drawingContext, double width, double height)
     {
-        drawingContext.DrawRectangle(GridHalfHourBrush, null, new Rect(0, 0, width, height));
+        drawingContext.DrawRectangle(Brushes.GridSurface, null, new Rect(0, 0, width, height));
         for (int hour = 0; hour <= VisibleCells / 2; hour++)
         {
             double y = hour * 2 * CellHeight;
-            drawingContext.DrawLine(GridHourPen, new Point(0, y), new Point(width, y));
+            drawingContext.DrawLine(Brushes.GridHour, new Point(0, y), new Point(width, y));
             // 半小时位置画浅色短线，让半小时选择粒度可见（含整点之间的 :30 分界）。
             if (hour < VisibleCells / 2)
             {
                 drawingContext.DrawLine(
-                    GridHalfHourPen,
+                    Brushes.GridHalfHour,
                     new Point(0, y + CellHeight),
                     new Point(width, y + CellHeight));
             }
@@ -381,7 +433,7 @@ public sealed class RoomBookingBoardControl : FrameworkElement
         for (int roomIndex = 1; roomIndex <= rooms.Count; roomIndex++)
         {
             double x = roomIndex * RoomWidth;
-            drawingContext.DrawLine(RoomBorderPen, new Point(x, 0), new Point(x, height));
+            drawingContext.DrawLine(Brushes.RoomBorder, new Point(x, 0), new Point(x, height));
         }
     }
 
@@ -405,8 +457,8 @@ public sealed class RoomBookingBoardControl : FrameworkElement
             double top = CellToY(clippedStart);
             double height = (block.EndCellExclusive - clippedStart) * CellHeight;
             var rect = new Rect(roomIndex * RoomWidth + 1, top + 1, RoomWidth - 2, height - 2);
-            Brush fill = block.IsOwnedByCurrentUser ? OwnedFillBrush : OccupiedFillBrush;
-            Brush text = block.IsOwnedByCurrentUser ? OwnedTextBrush : OccupiedTextBrush;
+            Brush fill = block.IsOwnedByCurrentUser ? Brushes.OwnedFill : Brushes.OccupiedFill;
+            Brush text = block.IsOwnedByCurrentUser ? Brushes.OwnedText : Brushes.OccupiedText;
             drawingContext.DrawRectangle(fill, null, rect);
             if (height >= 18)
             {
@@ -440,8 +492,8 @@ public sealed class RoomBookingBoardControl : FrameworkElement
                 double top = CellToY(span.StartCell);
                 double height = (span.EndCellExclusive - span.StartCell) * CellHeight;
                 var rect = new Rect(roomIndex * RoomWidth + 1, top + 1, RoomWidth - 2, height - 2);
-                Brush fill = allFree ? SelectedFreeFillBrush : SelectedConflictFillBrush;
-                Pen border = allFree ? SelectedFreeBorderPen : SelectedConflictBorderPen;
+                Brush fill = allFree ? Brushes.SelectedFreeFill : Brushes.ConflictFill;
+                Pen border = allFree ? Brushes.SelectedFreeBorder : Brushes.ConflictBorder;
                 drawingContext.DrawRoundedRectangle(fill, border, rect, 3, 3);
                 if (height >= 18)
                 {
@@ -450,7 +502,7 @@ public sealed class RoomBookingBoardControl : FrameworkElement
                         drawingContext,
                         label,
                         rect,
-                        allFree ? SelectedFreeTextBrush : SelectedConflictTextBrush,
+                        allFree ? Brushes.SelectedFreeText : Brushes.ConflictText,
                         isBold: true);
                 }
 
@@ -459,7 +511,7 @@ public sealed class RoomBookingBoardControl : FrameworkElement
         }
     }
 
-    private static void DrawCornerHandles(DrawingContext drawingContext, Rect rect)
+    private void DrawCornerHandles(DrawingContext drawingContext, Rect rect)
     {
         Point[] corners =
         [
@@ -470,7 +522,7 @@ public sealed class RoomBookingBoardControl : FrameworkElement
         ];
         foreach (Point corner in corners)
         {
-            drawingContext.DrawEllipse(HandleFillBrush, HandleBorderPen, corner, HandleRadius, HandleRadius);
+            drawingContext.DrawEllipse(Brushes.HandleFill, Brushes.HandleBorder, corner, HandleRadius, HandleRadius);
         }
     }
 
@@ -487,7 +539,7 @@ public sealed class RoomBookingBoardControl : FrameworkElement
             CellToY(firstCell) + 1,
             (lastRoomExclusive - firstRoom) * RoomWidth - 2,
             (lastCellExclusive - firstCell) * CellHeight - 2);
-        drawingContext.DrawRectangle(PreviewFillBrush, PreviewBorderPen, rect);
+        drawingContext.DrawRectangle(Brushes.PreviewFill, Brushes.PreviewBorder, rect);
     }
 
     private void DrawText(
@@ -519,14 +571,14 @@ public sealed class RoomBookingBoardControl : FrameworkElement
         InvalidateVisual();
     }
 
-    private static SolidColorBrush CreateFrozenBrush(string color)
+    private static SolidColorBrush CreateFrozenBrush(Color color)
     {
-        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+        var brush = new SolidColorBrush(color);
         brush.Freeze();
         return brush;
     }
 
-    private static Pen CreateFrozenPen(string color)
+    private static Pen CreateFrozenPen(Color color)
     {
         var pen = new Pen(CreateFrozenBrush(color), 1);
         pen.Freeze();

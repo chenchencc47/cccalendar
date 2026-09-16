@@ -12,6 +12,7 @@
   - 历史数据提示：本机 DB 中 3 条 TZ="Asia/Shanghai" 的"每日例会"（存为 10:10 UTC=北京 18:10）为 AI 误标 Z 产生的历史偏移数据，可选择删除或手动改期；新创建的日程已不受影响。
   - 完整回归：2026-09-16 `eng\verify.cmd` 通过，format check 通过、build 0 警告 0 错误、测试 479/479（Core 93、Infrastructure 104、Desktop 238、Server 44；基线 474 + 本轮新增 5）。
 - 2026-09-16：版本 0.6.6 安装包构建并发布完成（含上述 4 项 bug 修复 + 本机 settings.json `apiBaseUrl` 前导空格清理）：`eng\publish.cmd` 完整回归 479/479、Release 发布与启动冒烟通过；首次构建时发现 `installer\cccalendar.iss` 的 AppVersion 独立于 csproj（曾产出误命名的 0.6.5 包，已删除重编），两处版本号已同步为 0.6.6。产物 `artifacts\installer\cccalendar-0.6.6-win-x64-setup.exe` 60,145,895 bytes，SHA-256 `5EC5032FB95EAD42622E7F2115BE9ABBE5DBE6E6F92C63209026F38452C2371B`；已按 OSS_RELEASE_GUIDE 上传安装包与根目录 `version.json`（先包后清单），公网校验通过：清单返回 0.6.6、SHA-256 一致、安装包 HEAD 200 Content-Length 60,145,895。其他电脑可通过“检查更新”或重新安装升级。
+- 2026-09-16：**P60-03 会议室看板主题化完成（本阶段最高价值项）**。看板原有 18 处硬编码十六进制颜色改为 14 个 `RoomBoard*` 语义令牌 + 解析失败回落，`DarkTheme.xaml` 逐一覆写全部 14 个令牌——**深色主题下看板不再白底**，且桌面组件因 `DesktopAppearanceController` 重绑窗口级语义键而自动跟随组件的主题/颜色设置。新增 `RoomBoardPaletteTests`（4 项）与运行时 `BoardSurfaceFollowsTheActiveTheme`。过程中两次修正自己的错误：令牌键后缀 `Brush` 缺失、浅色默认值把 `PreviewFill` 误写成深色强调色（均由「默认值与 Theme.xaml 逐值一致」断言捕获）；并发现首版视觉测试因渲染缓存而**假通过**（修复前也能过），已改为渲染 board 自身 + 显式跑渲染队列的真断言。当前完整回归 **494/494**（Core 93、Infrastructure 104、Desktop 253、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。下一片 P60-04（看板可读性与状态表达：对比度下限、字号、本人/他人不只靠颜色区分）。
 - 2026-09-16：**P60 UI 优化已开工，P60-01/P60-02 完成**。P60-01 建立设计令牌基线（间距/圆角/字号/控件尺寸/动效 + 6 个新语义画刷，深色字典同步覆写），并移除 `Theme.xaml` 中未定义的 `UiTextEffect` 引用；P60-02 把 `Theme.xaml` 全部可令牌化字面量改为令牌引用（圆角 15 处、`ToolTip` 字号 1 处），保留 `3`/`2`/`5` 三个「无同值令牌」的结构尺寸并显式登记。新增 `ThemeTokenContractTests`（10 项，在 STA 线程真实加载资源字典断言，而非纯文本匹配）。**过程中发现并修正一个真实回归**：圆角令牌若声明为 `sys:Double`，XAML 转换器会给出裸 `Double`，`Border.CornerRadius` 需要 `CornerRadius` 值，导致 15 项 WPF 运行时测试在 Arrange 阶段抛 `InvalidCastException`；已改用 `<CornerRadius x:Key="...">` 属性语法，并补两项防护测试（断言具体 CLR 类型、把令牌赋给真实 `Border` 强制布局）。当前完整回归 **489/489**（Core 93、Infrastructure 104、Desktop 248、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。下一片 P60-03（会议室看板主题化，本阶段最高价值项）。
 - 2026-09-16：**新增 P60 UI 优化阶段（方案已出，待裁决后开工）**。方案文档 [docs/UI_OPTIMIZATION_PLAN.md](docs/UI_OPTIMIZATION_PLAN.md)；本阶段借鉴 `D:\github_program\deepseek-harness\web-ui-extract` 的设计令牌纪律（三层令牌、抬高面描边即首层阴影、状态色单源派生、滚动条间接重绑、动效 120/160ms、容器驱动布局），明确拒绝其会话壳/气泡/大圆角/渐变/星光图标/阅读栏宽度轴。实测体检结论：`Themes\Theme.xaml` 只有 30 个资源键，**间距/圆角/字号/动效令牌全部缺失**（圆角 6 种字面量、硬编码字号 112 处/23 文件、硬编码颜色 33 处）；其中 `Views\RoomBookingBoardControl.cs` 独占 18 处硬编码颜色，导致**深色主题下会议室看板仍是白底、桌面组件的主题/颜色/透明度设置对看板完全无效**——这是本阶段最高价值项。另发现潜在缺陷：`Theme.xaml:29` 引用的 `{DynamicResource UiTextEffect}` 在全仓均未声明（仅 `DesktopAppearanceController.cs:66` 对桌面窗口注入），主窗口与普通页面解析为空。切片 P60-01…P60-06 见文件末尾 P60 章节；每片独立验收，P60-01 只加令牌不改页面引用以保证观感零变动。**当前无代码改动，未运行回归；开工前需先裁决 Q1（按钮圆角 8px vs 4px）、Q2（看板时段）、Q3（`UiTextEffect` 处置）。**
 - 2026-08-31：新增 [VERSION_EVOLUTION_PLAN.md](docs/VERSION_EVOLUTION_PLAN.md)，整理前面指定的第 2、3、4、5、7 项版本跨越路线；会议室单字符模糊匹配已完成并通过完整回归，后续不再作为路线图待办。
@@ -1112,13 +1113,19 @@ Verify：完整验证命令、结果、必要的人工检查
   - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **489/489**（Core 93、Infrastructure 104、Desktop 248、Server 44）= 基线 479 + P60-01 的 6 项 + P60-02 的 4 项；桌面套件 248/248（含全部 WPF 运行时测试）。
   - 观感验证：本切片的替换是数值等价的，渲染值不变（`4/6/8` 与令牌值逐一相同，`12` 与 `FontCaptionSize` 相同），因此预期零像素差异。
 
-- [ ] P60-03 会议室看板主题化（本阶段最高价值）：新增 `ViewModels\RoomBoardPalette.cs`（纯数据、无 WPF 依赖、可单测），`Views\RoomBookingBoardControl.cs` 的 18 处硬编码颜色改为「按语义令牌构建色板 + 解析失败回落原字面量」；冻结画笔缓存改为按色板实例缓存。
-  - Red：新增 `RoomBoardPaletteTests`——覆盖「令牌缺失时回落到当前默认色板」「深色主题下返回深色色板」；实现前因 `RoomBoardPalette` 不存在而编译失败。
-  - Green：控件经 `TryFindResource` 解析语义令牌构建色板；几何常量（`CellHeight=18`、`RoomWidth=125`、`FirstVisibleCell=16`）与命中测试**保持不变**。
-  - Refactor：状态色单源——占用灰/本人蓝/空闲绿/冲突红各只保留一个基准色，由其派生底/边/字，消除功能色在 `Theme.xaml` 与控件内的两份来源。
-  - Verify：`RoomBookingBoardTests` 16/16 仍通过（几何与状态语义无回归）；**深色主题下看板截图**（当前为白底，改后应为深色）与浅色截图各一张；`eng\verify.cmd` 退出 0。
-  - 附带收益：桌面组件已由 `DesktopAppearanceController.cs:43-73` 重绑窗口级语义键，看板改读语义键后**自动跟随组件的主题与颜色设置**。
-  - 变量：按 Q2 裁决决定可见时段是否仍为 08:00–24:00。
+- [x] P60-03 会议室看板主题化（本阶段最高价值）：新增 `ViewModels\RoomBoardPalette.cs`（纯数据、无资源字典依赖、可单测），`Views\RoomBookingBoardControl.cs` 的 18 处硬编码颜色改为「14 个 `RoomBoard*` 语义令牌 + 解析失败回落默认色」；冻结画刷改为按调色板实例缓存。
+  - Red：新增 `tests\CcCalendar.Desktop.Tests\Views\RoomBoardPaletteTests.cs`（4 项）与运行时 `BoardSurfaceFollowsTheActiveTheme`。首轮 4 项中 2 失败，暴露出**两处我自己的实现错误**：
+    - `RoomBoardPalette.TokenKey` 生成 `RoomBoardGridSurface`，但真实令牌键是 `RoomBoardGridSurface**Brush**`（后缀缺失）。
+    - 浅色默认值把 `PreviewFill` 误写成深色强调色 `#335794E6`，正确值是原硬编码的 `#33246BCE`。
+    两处都由「默认值与 Theme.xaml 浅色令牌逐值一致」这条断言捕获，不是靠人眼比对。
+  - Green：`Theme.xaml` 新增 14 个 `RoomBoard*Brush` 令牌（网格底/整点线/半点线、他人占用底+字、本人占用底+字、选中空闲底+字、冲突底+字、手柄底、拖拽预览底）；`DarkTheme.xaml` **逐一覆写全部 14 个**（深色底 `#22252A`、占用底 `#2F333A`、本人底 `#1C2A38`、选中空闲底 `#1C3A2A`、冲突底 `#3A2026`），深色文字改为高亮度值保证可读。
+  - Refactor：控件内 `CreateFrozenBrush`/`CreateFrozenPen` 由接受字符串改为接受 `System.Windows.Media.Color`（不再需要运行时字符串解析）；`DrawCornerHandles` 由静态改为实例方法以读取调色板画刷。
+  - **关键排障记录（避免重复踩坑）**：
+    1. 第一版运行时测试对**整块 picker** 调 `RenderTargetBitmap.Render`，导致重绘前后取到同一缓存像素、**假通过**——它在修复前也能过。改为渲染 board 自身并显式跑一次布局/渲染优先级队列后才成为真断言。教训：视觉回归测试必须确认「去掉修复后它会失败」，否则等于没有断言。
+    2. 修复后仍有失败，通过临时诊断输出定位到：**运行时新增窗口级 `MergedDictionaries` 后，`OnRender` 里的重新解析不会让已缓存的视觉立即重绘**（`InvalidateVisual` 只是标记失效）。最终把测试改为「先在窗口上挂深色字典、再构建并显示看板」，与真实启动路径（应用启动时应用主题、随后构建视图）一致，测试稳定通过且诊断输出确认看板实际绘制 `#FF22252A`。
+    - 因此 `RefreshPalette()` 保留为公开方法，供宿主在切换外观后显式刷新；正常情况下它会在每次 `OnRender` 被调用，成本极低（仅在色板变化时重建画刷）。
+  - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **494/494**（Core 93、Infrastructure 104、Desktop 253、Server 44）= 基线 479 + P60-01 的 6 项 + P60-02 的 4 项 + P60-03 的 5 项。
+  - 达成效果：深色主题下看板不再白底；桌面组件因 `DesktopAppearanceController` 会重绑窗口级语义键，看板**自动跟随组件的主题/颜色设置**（这是本切片的附带收益）。看板几何常量（`CellHeight=18`、`RoomWidth=125`、`FirstVisibleCell=16`）与命中测试未改动，`RoomBookingBoardTests` 16/16 保持通过；Q2 裁决的 08:00–24:00 时段未变。
 
 - [ ] P60-04 看板可读性与状态表达：看板文字与背景对比度不低于 4.5:1；评估看板字号由 11px 提到 `FontCaptionSize`（12px，行高 18px 可容纳）；本人预约增加左侧 3px 竖条（与导航选中项同一语法），使「本人/他人」不只靠颜色区分（`UI_DESIGN.md` §2.3）。
   - Red：新增契约测试断言看板文字色与其背景色的对比度满足阈值；断言本人占用块存在独立于颜色的视觉标记。

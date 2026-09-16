@@ -30,6 +30,35 @@
     <SolidColorBrush x:Key="ElevationProminentBrush" Color="#FFFFFF" />
 
     <!--
+        会议室看板语义色（P60-03）。
+
+        看板是自绘控件，不能直接用主题的通用画刷：它需要「底 + 字」成对的状态色才能
+        保证状态可读。这组令牌是看板颜色的**唯一来源**——旧实现在控件内硬编码 18 处
+        十六进制值，导致深色主题下看板仍是白底，桌面组件的主题/颜色设置也完全无效。
+        深色值在 DarkTheme.xaml 中覆写（见 InitColorTokens 的契约测试）。
+    -->
+    <!-- 网格：空闲单元格底面与小时/半小时分隔线。 -->
+    <SolidColorBrush x:Key="RoomBoardGridSurfaceBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="RoomBoardGridHourBrush" Color="#D9DEE5" />
+    <SolidColorBrush x:Key="RoomBoardGridHalfHourBrush" Color="#F0F2F5" />
+    <!-- 他人占用：中性灰，不抢夺注意力。 -->
+    <SolidColorBrush x:Key="RoomBoardOccupiedFillBrush" Color="#E4E7EA" />
+    <SolidColorBrush x:Key="RoomBoardOccupiedTextBrush" Color="#626A75" />
+    <!-- 本人占用：强调色系，与「添加到我的日程」的蓝色归属一致。 -->
+    <SolidColorBrush x:Key="RoomBoardOwnedFillBrush" Color="#DCEBFF" />
+    <SolidColorBrush x:Key="RoomBoardOwnedTextBrush" Color="#174A8B" />
+    <!-- 选中且空闲：绿色（功能色 完成）。 -->
+    <SolidColorBrush x:Key="RoomBoardSelectedFreeFillBrush" Color="#D8F0DF" />
+    <SolidColorBrush x:Key="RoomBoardSelectedFreeTextBrush" Color="#1F5B3A" />
+    <!-- 选中但冲突：红色（功能色 逾期）。 -->
+    <SolidColorBrush x:Key="RoomBoardConflictFillBrush" Color="#F9E0E3" />
+    <SolidColorBrush x:Key="RoomBoardConflictTextBrush" Color="#8F2231" />
+    <!-- 选中块四角调节点。 -->
+    <SolidColorBrush x:Key="RoomBoardHandleFillBrush" Color="#FFFFFF" />
+    <!-- 拖拽预览：20% 透明度的强调色（#246BCE 的 alpha=0x33）。 -->
+    <SolidColorBrush x:Key="RoomBoardPreviewFillBrush" Color="#33246BCE" />
+
+    <!--
         设计令牌（P60-01）。数值为跨主题常量，只在浅色字典中声明一次，
         DarkTheme.xaml 不覆写。
 
