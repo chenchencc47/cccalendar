@@ -1101,6 +1101,15 @@ Verify：完整验证命令、结果、必要的人工检查
   - 同步更新 `docs/UI_DESIGN.md` §2.2 与 §2.4 令牌表；契约测试中的 8px 上限断言改为 16px，并修正 `RadiusTokenFor` 映射表（上一版把 10/12/16 全映射到 `RadiusXl`，是错的占位实现）。
   - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **507/507**（Core 93、Infrastructure 104、Desktop 266、Server 44）。
 
+- [x] P61-06 卡片去"表格感"：极淡描边 + 柔和阴影分层。
+  - 用户澄清：要保留的是**会议室看板的网格**（那是功能性结构），其余卡片的 1px 实线边框可改。已确认看板网格是 `RoomBookingBoardControl` 用 `DrawLine` 画上去的（L433/437/447），**不来自任何 Border**，本次改动完全不影响它。
+  - 新增 `HairlineBrush`（`#12000000`，约 7% 黑）：原 `BorderBrush`(#D9DEE5) 对白底约 1.35:1，用在卡片上会把界面切成一张张"表格"。
+  - 新增两档阴影 `ElevationPanelEffect`(Blur 8/深度 1/6%) 与 `ElevationProminentEffect`(Blur 16/深度 2/10%)。**主题此前 0 个阴影令牌**，抬高表面只能靠 1px 实线表达，这是界面"平"的另一半原因。`DropShadowEffect` 必须 `x:Shared="False"`——它是可变 Freezable，共享实例会让一个元素的改动影响所有引用者。
+  - 改法：17 处卡片边框由 `BorderBrush` 1px → `HairlineBrush` 0.5px，其中 13 处再叠加阴影。范围：统计页 6 张卡、助手页 4 个外层面板 + 思考块 + 标签 chip、今日页 2 项、待办卡片、项目看板列。
+  - **刻意保留**（不是漏改）：① 16×16 完成勾选框与状态标记（`TodayView:146`、`TodoView:63`、`ProjectView:123` 等）——边框是"未选中"的唯一信号，淡化会看不出状态；② `TodoView:240/310`、`ProjectView` 的 `AllowDrop="True"` 拖放区——边界是操作提示；③ `SettingsView` 的色块描边；④ 输入框/下拉/按钮边框（可交互性信号）；⑤ 看板网格线。
+  - 排障记录：批量替换时先按「`BorderBrush` 与 `BorderThickness` 同一行」匹配，结果 16 处全部跳过——实际 XAML 里两者**分别占一行**；改用「`BorderBrush` 行的下一行是 `BorderThickness="1"`」后命中。随后人工核对背景色，发现并回退了 4 处误改（3 个状态标记 + 1 个含拖放区的勾选框）。
+  - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **507/507**（Core 93、Infrastructure 104、Desktop 266、Server 44）。
+
 - [ ] P61-03 微组件库：LoadingRing（加载环）、StateDot（状态点，带追逐动画）、ConnectionIndicator（连接状态，用在设置页团队连接）。参考实现里这三者都有独立动画，是"界面活起来"的主要来源。
 - [ ] P61-04 截图工具与效果对比图：仓库当前无 QA 截图脚本（`.gitignore` 排除了 `/qa*.ps1`），需补一个可持续使用的截图入口，输出"快速新增 + 设置页"的改动前后对比，作为观感效果证据。
 - [ ] P61-05 其余交互控件接入动效：`ComboBoxItem`、`TabItem`、`MenuItem`、`ToggleButton`（四处的悬停仍是瞬间换色）。

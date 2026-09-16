@@ -1,4 +1,4 @@
-<UserControl x:Class="CcCalendar.Desktop.Views.ProjectView"
+﻿<UserControl x:Class="CcCalendar.Desktop.Views.ProjectView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
@@ -122,8 +122,8 @@
                                             Margin="0,0,12,0"
                                             Padding="12"
                                             Background="Transparent"
-                                            BorderBrush="{DynamicResource BorderBrush}"
-                                            BorderThickness="1"
+                                            BorderBrush="{DynamicResource HairlineBrush}"
+                                            BorderThickness="0.5"
                                             CornerRadius="6">
                                         <StackPanel>
                                             <DockPanel>
@@ -144,8 +144,8 @@
                                                         <Border Margin="0,0,0,6"
                                                                 Padding="10,8"
                                                                 Background="{DynamicResource SurfaceBrush}"
-                                                                BorderBrush="{DynamicResource BorderBrush}"
-                                                                BorderThickness="1"
+                                                                BorderBrush="{DynamicResource HairlineBrush}"
+                                                                BorderThickness="0.5"
                                                                 CornerRadius="4">
                                                             <StackPanel Orientation="Horizontal">
                                                                 <Border Width="8"

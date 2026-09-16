@@ -30,6 +30,36 @@
     <SolidColorBrush x:Key="ElevationProminentBrush" Color="#FFFFFF" />
 
     <!--
+        极淡描边（P61-06）。原 BorderBrush(#D9DEE5) 与白底对比约 1.35:1，
+        用在卡片上会把界面切成一张张"表格"。卡片改用这档描边，靠底色差与阴影分层。
+        分隔线、输入框与色块仍用 BorderBrush（那里需要明确的边界信号）。
+    -->
+    <SolidColorBrush x:Key="HairlineBrush" Color="#12000000" />
+
+    <!--
+        柔和阴影（P61-06）。主题此前 0 个阴影令牌，抬高表面只能靠 1px 实线边框表达，
+        这正是界面"平"的另一半原因。参考实现的做法是「描边即阴影的第一层」：
+        抬高面不再叠实线边框，改用一层极淡描边 + 柔和投影。
+
+        x:Shared="False" 是必需的：DropShadowEffect 是可变 Freezable，
+        共享实例会让一个元素上的改动（含动画）影响所有引用者。
+    -->
+    <DropShadowEffect x:Key="ElevationPanelEffect"
+                      x:Shared="False"
+                      BlurRadius="8"
+                      Direction="270"
+                      Opacity="0.06"
+                      ShadowDepth="1"
+                      Color="#000000" />
+    <DropShadowEffect x:Key="ElevationProminentEffect"
+                      x:Shared="False"
+                      BlurRadius="16"
+                      Direction="270"
+                      Opacity="0.10"
+                      ShadowDepth="2"
+                      Color="#000000" />
+
+    <!--
         交互叠加色（P61-01）。借鉴 deepseek-harness 的做法：悬停/按下是**半透明叠加**
         而不是不透明换色。
 
