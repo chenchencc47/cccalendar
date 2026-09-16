@@ -26,7 +26,8 @@ public readonly record struct RoomBoardPalette(
     Color ConflictFill,
     Color ConflictText,
     Color HandleFill,
-    Color PreviewFill)
+    Color PreviewFill,
+    Color AccentBar)
 {
     /// <summary>令牌键前缀，供解析器与契约测试共用。</summary>
     public const string TokenPrefix = "RoomBoard";
@@ -40,7 +41,7 @@ public readonly record struct RoomBoardPalette(
         GridHour: Parse("#D9DEE5"),
         GridHalfHour: Parse("#F0F2F5"),
         OccupiedFill: Parse("#E4E7EA"),
-        OccupiedText: Parse("#626A75"),
+        OccupiedText: Parse("#5C6470"),
         OwnedFill: Parse("#DCEBFF"),
         OwnedText: Parse("#174A8B"),
         SelectedFreeFill: Parse("#D8F0DF"),
@@ -48,7 +49,8 @@ public readonly record struct RoomBoardPalette(
         ConflictFill: Parse("#F9E0E3"),
         ConflictText: Parse("#8F2231"),
         HandleFill: Parse("#FFFFFF"),
-        PreviewFill: Parse("#33246BCE"));
+        PreviewFill: Parse("#33246BCE"),
+        AccentBar: Parse("#174A8B"));
 
     /// <summary>
     /// 用解析器覆写各分量。解析器收到的是**完整令牌键**（如 <c>RoomBoardOccupiedFill</c>），
@@ -72,7 +74,8 @@ public readonly record struct RoomBoardPalette(
             ConflictFill: resolve(TokenKey(nameof(ConflictFill))) ?? ConflictFill,
             ConflictText: resolve(TokenKey(nameof(ConflictText))) ?? ConflictText,
             HandleFill: resolve(TokenKey(nameof(HandleFill))) ?? HandleFill,
-            PreviewFill: resolve(TokenKey(nameof(PreviewFill))) ?? PreviewFill);
+            PreviewFill: resolve(TokenKey(nameof(PreviewFill))) ?? PreviewFill,
+            AccentBar: resolve(TokenKey(nameof(AccentBar))) ?? AccentBar);
     }
 
     /// <summary>

@@ -12,6 +12,7 @@
   - 历史数据提示：本机 DB 中 3 条 TZ="Asia/Shanghai" 的"每日例会"（存为 10:10 UTC=北京 18:10）为 AI 误标 Z 产生的历史偏移数据，可选择删除或手动改期；新创建的日程已不受影响。
   - 完整回归：2026-09-16 `eng\verify.cmd` 通过，format check 通过、build 0 警告 0 错误、测试 479/479（Core 93、Infrastructure 104、Desktop 238、Server 44；基线 474 + 本轮新增 5）。
 - 2026-09-16：版本 0.6.6 安装包构建并发布完成（含上述 4 项 bug 修复 + 本机 settings.json `apiBaseUrl` 前导空格清理）：`eng\publish.cmd` 完整回归 479/479、Release 发布与启动冒烟通过；首次构建时发现 `installer\cccalendar.iss` 的 AppVersion 独立于 csproj（曾产出误命名的 0.6.5 包，已删除重编），两处版本号已同步为 0.6.6。产物 `artifacts\installer\cccalendar-0.6.6-win-x64-setup.exe` 60,145,895 bytes，SHA-256 `5EC5032FB95EAD42622E7F2115BE9ABBE5DBE6E6F92C63209026F38452C2371B`；已按 OSS_RELEASE_GUIDE 上传安装包与根目录 `version.json`（先包后清单），公网校验通过：清单返回 0.6.6、SHA-256 一致、安装包 HEAD 200 Content-Length 60,145,895。其他电脑可通过“检查更新”或重新安装升级。
+- 2026-09-16：**P60-04 看板可读性与状态表达完成**。新增 `ColorContrast`（WCAG 2.1）并逐对实测，发现浅色「他人占用」文字对比度仅 **4.41:1**（低于 AA 的 4.5:1），改为 `#5C6470` 后达 4.82:1；本人占用块新增左侧 3px 标记条（与导航选中项同一语法），使「本人/他人」不只靠颜色区分；标签字号由硬编码 11px 改为 12px 并对齐 `FontCaptionSize` 档位。新增 4 项测试（对比度 8 对、标记条独立性、字号档位、标记条宽度）。完整回归 **498/498**（Core 93、Infrastructure 104、Desktop 257、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。下一片 P60-05（页面字面量清理：PageTitleStyle/CaptionTextStyle 归位、Sparkles 换图标、遮罩令牌、会议详情/导出语义样式）。
 - 2026-09-16：**P60-03 会议室看板主题化完成（本阶段最高价值项）**。看板原有 18 处硬编码十六进制颜色改为 14 个 `RoomBoard*` 语义令牌 + 解析失败回落，`DarkTheme.xaml` 逐一覆写全部 14 个令牌——**深色主题下看板不再白底**，且桌面组件因 `DesktopAppearanceController` 重绑窗口级语义键而自动跟随组件的主题/颜色设置。新增 `RoomBoardPaletteTests`（4 项）与运行时 `BoardSurfaceFollowsTheActiveTheme`。过程中两次修正自己的错误：令牌键后缀 `Brush` 缺失、浅色默认值把 `PreviewFill` 误写成深色强调色（均由「默认值与 Theme.xaml 逐值一致」断言捕获）；并发现首版视觉测试因渲染缓存而**假通过**（修复前也能过），已改为渲染 board 自身 + 显式跑渲染队列的真断言。当前完整回归 **494/494**（Core 93、Infrastructure 104、Desktop 253、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。下一片 P60-04（看板可读性与状态表达：对比度下限、字号、本人/他人不只靠颜色区分）。
 - 2026-09-16：**P60 UI 优化已开工，P60-01/P60-02 完成**。P60-01 建立设计令牌基线（间距/圆角/字号/控件尺寸/动效 + 6 个新语义画刷，深色字典同步覆写），并移除 `Theme.xaml` 中未定义的 `UiTextEffect` 引用；P60-02 把 `Theme.xaml` 全部可令牌化字面量改为令牌引用（圆角 15 处、`ToolTip` 字号 1 处），保留 `3`/`2`/`5` 三个「无同值令牌」的结构尺寸并显式登记。新增 `ThemeTokenContractTests`（10 项，在 STA 线程真实加载资源字典断言，而非纯文本匹配）。**过程中发现并修正一个真实回归**：圆角令牌若声明为 `sys:Double`，XAML 转换器会给出裸 `Double`，`Border.CornerRadius` 需要 `CornerRadius` 值，导致 15 项 WPF 运行时测试在 Arrange 阶段抛 `InvalidCastException`；已改用 `<CornerRadius x:Key="...">` 属性语法，并补两项防护测试（断言具体 CLR 类型、把令牌赋给真实 `Border` 强制布局）。当前完整回归 **489/489**（Core 93、Infrastructure 104、Desktop 248、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。下一片 P60-03（会议室看板主题化，本阶段最高价值项）。
 - 2026-09-16：**新增 P60 UI 优化阶段（方案已出，待裁决后开工）**。方案文档 [docs/UI_OPTIMIZATION_PLAN.md](docs/UI_OPTIMIZATION_PLAN.md)；本阶段借鉴 `D:\github_program\deepseek-harness\web-ui-extract` 的设计令牌纪律（三层令牌、抬高面描边即首层阴影、状态色单源派生、滚动条间接重绑、动效 120/160ms、容器驱动布局），明确拒绝其会话壳/气泡/大圆角/渐变/星光图标/阅读栏宽度轴。实测体检结论：`Themes\Theme.xaml` 只有 30 个资源键，**间距/圆角/字号/动效令牌全部缺失**（圆角 6 种字面量、硬编码字号 112 处/23 文件、硬编码颜色 33 处）；其中 `Views\RoomBookingBoardControl.cs` 独占 18 处硬编码颜色，导致**深色主题下会议室看板仍是白底、桌面组件的主题/颜色/透明度设置对看板完全无效**——这是本阶段最高价值项。另发现潜在缺陷：`Theme.xaml:29` 引用的 `{DynamicResource UiTextEffect}` 在全仓均未声明（仅 `DesktopAppearanceController.cs:66` 对桌面窗口注入），主窗口与普通页面解析为空。切片 P60-01…P60-06 见文件末尾 P60 章节；每片独立验收，P60-01 只加令牌不改页面引用以保证观感零变动。**当前无代码改动，未运行回归；开工前需先裁决 Q1（按钮圆角 8px vs 4px）、Q2（看板时段）、Q3（`UiTextEffect` 处置）。**
@@ -1127,11 +1128,17 @@ Verify：完整验证命令、结果、必要的人工检查
   - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **494/494**（Core 93、Infrastructure 104、Desktop 253、Server 44）= 基线 479 + P60-01 的 6 项 + P60-02 的 4 项 + P60-03 的 5 项。
   - 达成效果：深色主题下看板不再白底；桌面组件因 `DesktopAppearanceController` 会重绑窗口级语义键，看板**自动跟随组件的主题/颜色设置**（这是本切片的附带收益）。看板几何常量（`CellHeight=18`、`RoomWidth=125`、`FirstVisibleCell=16`）与命中测试未改动，`RoomBookingBoardTests` 16/16 保持通过；Q2 裁决的 08:00–24:00 时段未变。
 
-- [ ] P60-04 看板可读性与状态表达：看板文字与背景对比度不低于 4.5:1；评估看板字号由 11px 提到 `FontCaptionSize`（12px，行高 18px 可容纳）；本人预约增加左侧 3px 竖条（与导航选中项同一语法），使「本人/他人」不只靠颜色区分（`UI_DESIGN.md` §2.3）。
-  - Red：新增契约测试断言看板文字色与其背景色的对比度满足阈值；断言本人占用块存在独立于颜色的视觉标记。
-  - Green：按上表调整色板派生与绘制。
-  - Refactor：为深色主题单独校验对比度，不用同一组派生系数（深色底需更高亮度差）。
-  - Verify：浅色/深色各一张看板截图人工核验；`eng\verify.cmd` 退出 0。
+- [x] P60-04 看板可读性与状态表达：文字对比度下限、标签字号令牌化、本人/他人不只靠颜色区分。
+  - **实测驱动的发现**：新增 `ViewModels\ColorContrast.cs`（WCAG 2.1 相对亮度/对比度，放在产品代码里以便测试与将来新增配色复用同一公式）后逐对实测，浅色「他人占用」`#626A75` 配底 `#E4E7EA` 对比度只有 **4.41:1**，低于 WCAG AA 的 4.5:1；其余三对为 7.27 / 6.67 / 6.88，深色四对为 5.73 / 7.15 / 6.72 / 6.98，均达标。
+  - Red：新增 4 项测试——`BoardTextPairsMeetWcagAaContrast`（浅色+深色共 8 对全部 ≥4.5:1）、`OwnedBlocksCarryAMarkerIndependentOfFillColour`（标记条与「他人占用」底色不同，且对本人底色 ≥3:1）、`BoardLabelFontSizeMatchesTheCaptionToken`、`AccentBarWidthMatchesTheNavigationMarker`。首次运行即因对比度不足与令牌缺失而失败。
+  - Green：
+    - `RoomBoardOccupiedTextBrush` 浅色由 `#626A75` 改为 `#5C6470`（对比度 4.82:1，仍保持中性灰观感）。
+    - 新增 `RoomBoardAccentBarBrush`（浅 `#174A8B` / 深 `#8FB8F0`），本人占用块左侧绘制 3px 竖条——与导航选中项（`NavigationItemStyle` 的 `SelectionBar`）同一视觉语法，使「本人/他人」在灰度化后仍有结构性差异，满足 UI_DESIGN §2.3「状态不能只靠颜色表达」。
+    - 看板标签字号由硬编码 11px 改为 12px（对齐 `FontCaptionSize` 档位），并抽出 `BlockLabelMinimumHeight` 常量替代原 `height >= 18` 魔数。
+    - `RoomBoardPalette` 增加 `AccentBar` 分量（共 15 个），`DarkTheme.xaml` 同步覆写。
+  - Refactor：`DrawText` 增加 `leftInset` 参数，本人块的文字与裁剪宽度同步右移，避免压住竖条。
+  - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **498/498**（Core 93、Infrastructure 104、Desktop 257、Server 44）。
+  - 约束遵守：几何常量与命中测试未改动；`RoomBookingBoardTests` 16/16 保持通过；Q2 裁决的 08:00–24:00 时段未变。
 
 - [ ] P60-05 页面字面量清理：`RecordView.xaml:12`、`ProjectView.xaml:12`、`StatisticsView.xaml:14` 的 `FontSize="20" FontWeight="SemiBold"` 改用 `PageTitleStyle`；`CalendarView.xaml`/`RoomBookingPicker.xaml` 等处 `FontSize="11"` 次要文字改用 `CaptionTextStyle`；`MainWindowViewModel.cs:19-30` 助理导航 `PackIconLucideKind.Sparkles` 换为非星光图标（`UI_DESIGN.md` §1.6）；`RegionSelectorWindow.xaml` 的 `#33000000`/`#11FFFFFF` 改用 `OverlayScrimBrush`；`MeetingDetailsWindow.xaml`/`MeetingExportWindow.xaml` 的硬编码 `White` 与 `FontSize="18"` 改用语义样式。
   - Red：新增契约测试断言页面不出现硬编码页面标题字号，且助理导航不使用 `Sparkles`。

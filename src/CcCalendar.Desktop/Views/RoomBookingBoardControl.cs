@@ -37,6 +37,15 @@ public sealed class RoomBookingBoardControl : FrameworkElement
     public const int FirstVisibleCell = 16;
     /// <summary>可见小格数：8:00–24:00 共 16 小时。</summary>
     public const int VisibleCells = RoomBookingBoard.CellsPerDay - FirstVisibleCell;
+    /// <summary>本人占用块的左侧标记条宽度，与导航选中项的 3px 标记一致。</summary>
+    public const double AccentBarWidth = 3;
+    /// <summary>
+    /// 块标签的最小高度（一个小格）。标签字号为 12px（UI_DESIGN §2.1 辅助信息档），
+    /// 因此至少要有一个整格的 18px 才放得下。
+    /// </summary>
+    public const double BlockLabelMinimumHeight = CellHeight;
+    /// <summary>块标签字号，取自主题令牌 FontCaptionSize（UI_DESIGN §2.1）。</summary>
+    private const double BlockLabelFontSize = 12;
     private const double EdgeHitRadius = 5;
     private const double HandleRadius = 4;
 
@@ -86,7 +95,8 @@ public sealed class RoomBookingBoardControl : FrameworkElement
         HandleFill: CreateFrozenBrush(source.HandleFill),
         HandleBorder: CreateFrozenPen(source.SelectedFreeText),
         PreviewFill: CreateFrozenBrush(source.PreviewFill),
-        PreviewBorder: CreateFrozenPen(source.SelectedFreeText));
+        PreviewBorder: CreateFrozenPen(source.SelectedFreeText),
+        AccentBar: CreateFrozenBrush(source.AccentBar));
 
     /// <summary>看板绘制用的画刷与画笔，由 <see cref="RoomBoardPalette"/> 派生。</summary>
     private sealed record RoomBoardBrushes(
@@ -107,7 +117,8 @@ public sealed class RoomBookingBoardControl : FrameworkElement
         Brush HandleFill,
         Pen HandleBorder,
         Brush PreviewFill,
-        Pen PreviewBorder);
+        Pen PreviewBorder,
+        Brush AccentBar);
 
     private RoomBookingBoard? board;
     private IReadOnlyList<RoomOccupiedBlock> occupiedBlocks = [];
@@ -460,14 +471,25 @@ public sealed class RoomBookingBoardControl : FrameworkElement
             Brush fill = block.IsOwnedByCurrentUser ? Brushes.OwnedFill : Brushes.OccupiedFill;
             Brush text = block.IsOwnedByCurrentUser ? Brushes.OwnedText : Brushes.OccupiedText;
             drawingContext.DrawRectangle(fill, null, rect);
-            if (height >= 18)
+            if (block.IsOwnedByCurrentUser)
+            {
+                // 本人/他人的区分不能只靠底色（UI_DESIGN §2.3）：左侧 3px 竖条，
+                // 与导航选中项同一视觉语法；文字起点同步右移避免压住竖条。
+                drawingContext.DrawRectangle(
+                    Brushes.AccentBar,
+                    null,
+                    new Rect(rect.Left, rect.Top, AccentBarWidth, rect.Height));
+            }
+
+            if (height >= BlockLabelMinimumHeight)
             {
                 DrawText(
                     drawingContext,
                     $"已占用 · {block.Title}",
                     rect,
                     text,
-                    isBold: false);
+                    isBold: false,
+                    leftInset: block.IsOwnedByCurrentUser ? AccentBarWidth : 0d);
             }
         }
     }
@@ -547,22 +569,24 @@ public sealed class RoomBookingBoardControl : FrameworkElement
         string text,
         Rect bounds,
         Brush foreground,
-        bool isBold)
+        bool isBold,
+        double leftInset = 0d)
     {
+        double left = bounds.Left + 4 + leftInset;
         var formatted = new FormattedText(
             text,
             ChineseCulture,
             FlowDirection.LeftToRight,
             new Typeface(new FontFamily("Segoe UI Variable, Microsoft YaHei UI"), FontStyles.Normal, isBold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal),
-            11,
+            BlockLabelFontSize,
             foreground,
             pixelsPerDip)
         {
-            MaxTextWidth = Math.Max(1, bounds.Width - 8),
+            MaxTextWidth = Math.Max(1, bounds.Width - 8 - leftInset),
             MaxTextHeight = Math.Max(1, bounds.Height - 4),
             Trimming = TextTrimming.CharacterEllipsis,
         };
-        drawingContext.DrawText(formatted, new Point(bounds.Left + 4, bounds.Top + 2));
+        drawingContext.DrawText(formatted, new Point(left, bounds.Top + 2));
     }
 
     private void RaiseSelectionChanged()

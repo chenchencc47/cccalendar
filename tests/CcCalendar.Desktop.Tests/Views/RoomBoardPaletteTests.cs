@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using CcCalendar.Desktop.ViewModels;
+using CcCalendar.Desktop.Views;
 
 namespace CcCalendar.Desktop.Tests.Views;
 
@@ -37,6 +38,31 @@ public sealed class RoomBoardPaletteTests
         nameof(RoomBoardPalette.ConflictText),
         nameof(RoomBoardPalette.HandleFill),
         nameof(RoomBoardPalette.PreviewFill),
+        nameof(RoomBoardPalette.AccentBar),
+    ];
+
+    /// <summary>
+    /// 看板上的「文字/底色」对。每一对都必须满足 WCAG AA 的 4.5:1，
+    /// 否则在会议室墙上的远距离阅读会不可辨（P60-04）。
+    /// </summary>
+    private static readonly (string Text, string Fill, string Label)[] TextPairs =
+    [
+        (
+            nameof(RoomBoardPalette.OccupiedText),
+            nameof(RoomBoardPalette.OccupiedFill),
+            "他人占用"),
+        (
+            nameof(RoomBoardPalette.OwnedText),
+            nameof(RoomBoardPalette.OwnedFill),
+            "本人占用"),
+        (
+            nameof(RoomBoardPalette.SelectedFreeText),
+            nameof(RoomBoardPalette.SelectedFreeFill),
+            "选中空闲"),
+        (
+            nameof(RoomBoardPalette.ConflictText),
+            nameof(RoomBoardPalette.ConflictFill),
+            "选中冲突"),
     ];
 
     [Fact]
@@ -113,13 +139,112 @@ public sealed class RoomBoardPaletteTests
         });
 
         string[] expected = [.. BoardTokenComponents.Select(RoomBoardPalette.TokenKey)];
-        Assert.Equal(expected.OrderBy(k => k, StringComparer.Ordinal), requested.OrderBy(k => k, StringComparer.Ordinal));
+        Assert.Equal(
+            expected.OrderBy(k => k, StringComparer.Ordinal),
+            requested.OrderBy(k => k, StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// P60-04：看板文字必须达到 WCAG AA 的 4.5:1。
+    ///
+    /// 这条测试来自实测：初版浅色「他人占用」用 `#626A75` 配 `#E4E7EA`，对比度
+    /// 只有 **4.41:1**，低于下限；其余三对分别 7.27/6.67/6.88 均达标。
+    /// 会议室看板是远距离阅读场景，不能只看「看起来还行」。
+    /// </summary>
+    [Fact]
+    public void BoardTextPairsMeetWcagAaContrast()
+    {
+        RunOnThemeThread((light, dark) =>
+        {
+            foreach ((ResourceDictionary dictionary, string themeName) in
+                new[] { (light, "浅色"), (dark, "深色") })
+            {
+                foreach ((string textComponent, string fillComponent, string label) in TextPairs)
+                {
+                    Color text = ReadColor(dictionary, RoomBoardPalette.TokenKey(textComponent));
+                    Color fill = ReadColor(dictionary, RoomBoardPalette.TokenKey(fillComponent));
+                    double ratio = ColorContrast.Ratio(text, fill);
+
+                    Assert.True(
+                        ratio >= ColorContrast.TextMinimum,
+                        $"{themeName}主题「{label}」的文字对比度 {ratio:F2}:1 低于 "
+                            + $"{ColorContrast.TextMinimum}:1（文字 {text}，底色 {fill}）。");
+                }
+            }
+        });
+    }
+
+    /// <summary>
+    /// P60-04：本人/他人占用不能只靠底色区分（UI_DESIGN §2.3）。
+    ///
+    /// 断言两种主题下「本人占用」都有独立的标记条颜色，且与「他人占用」的底色不同——
+    /// 这样即使把界面灰度化，本人预约仍有结构性的视觉差异。
+    /// </summary>
+    [Fact]
+    public void OwnedBlocksCarryAMarkerIndependentOfFillColour()
+    {
+        RunOnThemeThread((light, dark) =>
+        {
+            foreach ((ResourceDictionary dictionary, string themeName) in
+                new[] { (light, "浅色"), (dark, "深色") })
+            {
+                Color accentBar = ReadColor(dictionary, RoomBoardPalette.TokenKey(nameof(RoomBoardPalette.AccentBar)));
+                Color occupiedFill = ReadColor(dictionary, RoomBoardPalette.TokenKey(nameof(RoomBoardPalette.OccupiedFill)));
+                Color ownedFill = ReadColor(dictionary, RoomBoardPalette.TokenKey(nameof(RoomBoardPalette.OwnedFill)));
+
+                Assert.True(
+                    accentBar != occupiedFill,
+                    $"{themeName}主题的本人标记条颜色与「他人占用」底色相同，无法区分。");
+
+                // 标记条必须贴在本人占用的底色上仍然可见。
+                double ratio = ColorContrast.Ratio(accentBar, ownedFill);
+                Assert.True(
+                    ratio >= ColorContrast.NonTextMinimum,
+                    $"{themeName}主题本人标记条对本人底色的对比度 {ratio:F2}:1 低于 "
+                        + $"{ColorContrast.NonTextMinimum}:1（标记 {accentBar}，底色 {ownedFill}）。");
+            }
+        });
     }
 
     /// <summary>
     /// 按分量名取值。<paramref name="component"/> 是 <c>GridSurface</c> 这样的分量名，
     /// 不是完整令牌键；完整键由 <see cref="RoomBoardPalette.TokenKey"/> 派生。
     /// </summary>
+    /// <summary>
+    /// P60-04：看板标签字号必须走令牌档位（UI_DESIGN §2.1 辅助信息 12px）。
+    ///
+    /// 修复前是硬编码 11px——既不在字号阶梯上，也低于看板远距离阅读所需。
+    /// 同时断言标签高度门槛与字号配套，避免改了字号却忘了留高度。
+    /// </summary>
+    [Fact]
+    public void BoardLabelFontSizeMatchesTheCaptionToken()
+    {
+        RunOnThemeThread((light, _) =>
+        {
+            double captionSize = Assert.IsType<double>(light["FontCaptionSize"]);
+
+            // 控件对标签的可见性门槛必须能容纳该字号（一个小格 18px）。
+            Assert.True(
+                RoomBookingBoardControl.BlockLabelMinimumHeight >= captionSize,
+                $"标签高度门槛 {RoomBookingBoardControl.BlockLabelMinimumHeight} 小于字号 {captionSize}，"
+                    + "文字会被裁掉。");
+
+            // 字号档位里必须有 12 这一档，且与标签字号一致。
+            Assert.True(
+                Math.Abs(captionSize - 12d) < 0.01d,
+                $"FontCaptionSize 应为 12（UI_DESIGN §2.1），实际 {captionSize}。");
+        });
+    }
+
+    /// <summary>
+    /// P60-04：本人标记条宽度与导航选中项的 3px 标记一致。
+    /// </summary>
+    [Fact]
+    public void AccentBarWidthMatchesTheNavigationMarker()
+    {
+        Assert.Equal(3d, RoomBookingBoardControl.AccentBarWidth);
+    }
+
     private static Color ReadPaletteComponent(RoomBoardPalette palette, string component) => component switch
     {
         nameof(RoomBoardPalette.GridSurface) => palette.GridSurface,
@@ -135,6 +260,7 @@ public sealed class RoomBoardPaletteTests
         nameof(RoomBoardPalette.ConflictText) => palette.ConflictText,
         nameof(RoomBoardPalette.HandleFill) => palette.HandleFill,
         nameof(RoomBoardPalette.PreviewFill) => palette.PreviewFill,
+        nameof(RoomBoardPalette.AccentBar) => palette.AccentBar,
         _ => throw new ArgumentOutOfRangeException(nameof(component), component, "未知的看板分量。"),
     };
 

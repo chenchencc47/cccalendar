@@ -54,6 +54,7 @@
     <SolidColorBrush x:Key="RoomBoardOccupiedTextBrush" Color="#A8AFB8" />
     <SolidColorBrush x:Key="RoomBoardOwnedFillBrush" Color="#1C2A38" />
     <SolidColorBrush x:Key="RoomBoardOwnedTextBrush" Color="#8FB8F0" />
+    <SolidColorBrush x:Key="RoomBoardAccentBarBrush" Color="#8FB8F0" />
     <SolidColorBrush x:Key="RoomBoardSelectedFreeFillBrush" Color="#1C3A2A" />
     <SolidColorBrush x:Key="RoomBoardSelectedFreeTextBrush" Color="#7FCFA2" />
     <SolidColorBrush x:Key="RoomBoardConflictFillBrush" Color="#3A2026" />

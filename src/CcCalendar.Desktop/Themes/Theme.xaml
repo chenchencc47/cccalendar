@@ -41,12 +41,17 @@
     <SolidColorBrush x:Key="RoomBoardGridSurfaceBrush" Color="#FFFFFF" />
     <SolidColorBrush x:Key="RoomBoardGridHourBrush" Color="#D9DEE5" />
     <SolidColorBrush x:Key="RoomBoardGridHalfHourBrush" Color="#F0F2F5" />
-    <!-- 他人占用：中性灰，不抢夺注意力。 -->
+    <!-- 他人占用：中性灰，不抢夺注意力。文字 #5C6470 对底 #E4E7EA 的对比度 4.82:1（WCAG AA）。 -->
     <SolidColorBrush x:Key="RoomBoardOccupiedFillBrush" Color="#E4E7EA" />
-    <SolidColorBrush x:Key="RoomBoardOccupiedTextBrush" Color="#626A75" />
+    <SolidColorBrush x:Key="RoomBoardOccupiedTextBrush" Color="#5C6470" />
     <!-- 本人占用：强调色系，与「添加到我的日程」的蓝色归属一致。 -->
     <SolidColorBrush x:Key="RoomBoardOwnedFillBrush" Color="#DCEBFF" />
     <SolidColorBrush x:Key="RoomBoardOwnedTextBrush" Color="#174A8B" />
+    <!--
+        本人占用的左侧标记条。本人/他人的区分不能只靠底色（UI_DESIGN §2.3
+        「状态不能只靠颜色表达」），这条 3px 竖条与导航选中项使用同一视觉语法。
+    -->
+    <SolidColorBrush x:Key="RoomBoardAccentBarBrush" Color="#174A8B" />
     <!-- 选中且空闲：绿色（功能色 完成）。 -->
     <SolidColorBrush x:Key="RoomBoardSelectedFreeFillBrush" Color="#D8F0DF" />
     <SolidColorBrush x:Key="RoomBoardSelectedFreeTextBrush" Color="#1F5B3A" />
