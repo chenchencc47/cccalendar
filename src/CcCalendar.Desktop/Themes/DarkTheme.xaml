@@ -31,4 +31,15 @@
     <SolidColorBrush x:Key="SuccessBrush" Color="#4EAF7A" />
     <SolidColorBrush x:Key="WarningBrush" Color="#D89342" />
     <SolidColorBrush x:Key="DangerBrush" Color="#E25563" />
+
+    <!--
+        Color: 语义画刷覆写（P60-01）。
+        间距/圆角/字号/控件尺寸/动效是跨主题常量，只在 Theme.xaml 声明一次，此处不覆写。
+    -->
+    <SolidColorBrush x:Key="ScrollbarThumbBrush" Color="#383D45" />
+    <SolidColorBrush x:Key="ScrollbarThumbHoverBrush" Color="#4A5058" />
+    <SolidColorBrush x:Key="FocusRingBrush" Color="#5794E6" />
+    <SolidColorBrush x:Key="OverlayScrimBrush" Color="#66000000" />
+    <SolidColorBrush x:Key="ElevationPanelBrush" Color="#22252A" />
+    <SolidColorBrush x:Key="ElevationProminentBrush" Color="#2A2E34" />
 </ResourceDictionary>

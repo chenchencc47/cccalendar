@@ -17,6 +17,61 @@
     <SolidColorBrush x:Key="DangerBrush" Color="#C43D4B" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#2E7D4F" />
     <SolidColorBrush x:Key="WarningBrush" Color="#A76500" />
+
+    <!--
+        新增语义画刷（P60-01）。深色值在 DarkTheme.xaml 中覆写。
+        这些键用于替换页面与控件里的硬编码十六进制颜色。
+    -->
+    <SolidColorBrush x:Key="ScrollbarThumbBrush" Color="#D9DEE5" />
+    <SolidColorBrush x:Key="ScrollbarThumbHoverBrush" Color="#C4CBD4" />
+    <SolidColorBrush x:Key="FocusRingBrush" Color="#246BCE" />
+    <SolidColorBrush x:Key="OverlayScrimBrush" Color="#33000000" />
+    <SolidColorBrush x:Key="ElevationPanelBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ElevationProminentBrush" Color="#FFFFFF" />
+
+    <!--
+        设计令牌（P60-01）。数值为跨主题常量，只在浅色字典中声明一次，
+        DarkTheme.xaml 不覆写。
+
+        间距：UI_DESIGN §2.2 的 4/8/12/16/24 基线。
+    -->
+    <sys:Double x:Key="SpacingXs">4</sys:Double>
+    <sys:Double x:Key="SpacingSm">8</sys:Double>
+    <sys:Double x:Key="SpacingMd">12</sys:Double>
+    <sys:Double x:Key="SpacingLg">16</sys:Double>
+    <sys:Double x:Key="SpacingXl">24</sys:Double>
+
+    <!--
+        圆角：UI_DESIGN §2.2，最大不超过 8px。
+
+        必须是 CornerRadius 而不是 sys:Double：`Border.CornerRadius` 需要 CornerRadius 值，
+        而 XAML 的 double 类型转换器会把 `{DynamicResource RadiusSm}` 解析成裸 Double，
+        控件在 Arrange 阶段抛 InvalidCastException。用属性语法声明即可复用 WPF 内建的
+        CornerRadius 类型转换器。
+    -->
+    <CornerRadius x:Key="RadiusSm">4</CornerRadius>
+    <CornerRadius x:Key="RadiusMd">6</CornerRadius>
+    <CornerRadius x:Key="RadiusLg">8</CornerRadius>
+
+    <!-- 字号：UI_DESIGN §2.1。正文沿用 UiBodyFontSize（14）。 -->
+    <sys:Double x:Key="FontCaptionSize">12</sys:Double>
+    <sys:Double x:Key="FontCompactSize">13</sys:Double>
+    <sys:Double x:Key="FontPanelTitleSize">16</sys:Double>
+    <sys:Double x:Key="FontPageTitleSize">20</sys:Double>
+    <sys:Double x:Key="FontClockSize">32</sys:Double>
+
+    <!-- 控件尺寸：UI_DESIGN §2.1/§2.2/§10。 -->
+    <sys:Double x:Key="ControlHeightPrimary">36</sys:Double>
+    <sys:Double x:Key="IconButtonSize">32</sys:Double>
+    <sys:Double x:Key="SidebarWidth">200</sys:Double>
+    <sys:Double x:Key="BrandBarHeight">56</sys:Double>
+    <sys:Double x:Key="NavigationItemHeight">38</sys:Double>
+
+    <!-- 动效：交互反馈 120ms，显隐过渡 160ms（参考 deepseek-harness 的实际取值中心）。 -->
+    <Duration x:Key="MotionFast">0:0:0.120</Duration>
+    <Duration x:Key="MotionBase">0:0:0.160</Duration>
+    <CubicEase x:Key="EasingStandard" EasingMode="EaseInOut" />
+
     <sys:Double x:Key="UiBodyFontSize">14</sys:Double>
     <sys:Double x:Key="UiControlHeight">32</sys:Double>
     <sys:Double x:Key="UiCompactControlHeight">28</sys:Double>
@@ -26,21 +81,20 @@
     <Style TargetType="TextBlock">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
         <Setter Property="FontSize" Value="{DynamicResource UiBodyFontSize}" />
-        <Setter Property="Effect" Value="{DynamicResource UiTextEffect}" />
     </Style>
 
     <Style x:Key="PageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontSize" Value="{DynamicResource FontPageTitleSize}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style x:Key="SectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontSize" Value="{DynamicResource FontPanelTitleSize}" />
         <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
 
     <Style x:Key="CaptionTextStyle" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="{DynamicResource FontCaptionSize}" />
         <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
     </Style>
 
@@ -61,7 +115,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="8">
+                            CornerRadius="{DynamicResource RadiusLg}">
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center" />
                     </Border>
@@ -96,7 +150,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="8">
+                            CornerRadius="{DynamicResource RadiusLg}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -141,7 +195,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="4">
+                            CornerRadius="{DynamicResource RadiusSm}">
                         <ScrollViewer x:Name="PART_ContentHost"
                                       Margin="{TemplateBinding Padding}" />
                     </Border>
@@ -188,7 +242,7 @@
                                 <Border x:Name="ComboItemBorder"
                                         Padding="{TemplateBinding Padding}"
                                         Background="Transparent"
-                                        CornerRadius="4">
+                                        CornerRadius="{DynamicResource RadiusSm}">
                                     <ContentPresenter VerticalAlignment="Center" />
                                 </Border>
                                 <ControlTemplate.Triggers>
@@ -236,7 +290,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="4"
+                                CornerRadius="{DynamicResource RadiusSm}"
                                 IsHitTestVisible="False" />
                         <ContentPresenter x:Name="ContentSite"
                                           Grid.Column="0"
@@ -284,7 +338,7 @@
                             <Border Background="{DynamicResource SurfaceBrush}"
                                     BorderBrush="{DynamicResource BorderBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="6"
+                                    CornerRadius="{DynamicResource RadiusMd}"
                                     Padding="4"
                                     MaxHeight="300"
                                     SnapsToDevicePixels="True">
@@ -396,7 +450,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="4">
+                            CornerRadius="{DynamicResource RadiusSm}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -436,7 +490,7 @@
                                 <Border Background="{DynamicResource SurfaceBrush}"
                                         BorderBrush="{DynamicResource BorderBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="6"
+                                        CornerRadius="{DynamicResource RadiusMd}"
                                         Padding="4"
                                         SnapsToDevicePixels="True">
                                     <Calendar x:Name="PART_Calendar"
@@ -501,7 +555,7 @@
                     <Border x:Name="ListItemBorder"
                             Padding="{TemplateBinding Padding}"
                             Background="Transparent"
-                            CornerRadius="4">
+                            CornerRadius="{DynamicResource RadiusSm}">
                         <ContentPresenter />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -620,7 +674,7 @@
                         <Border x:Name="ItemBorder"
                                 Padding="{TemplateBinding Padding}"
                                 Background="Transparent"
-                                CornerRadius="4">
+                                CornerRadius="{DynamicResource RadiusSm}">
                             <ContentPresenter VerticalAlignment="Center" />
                         </Border>
                     </Grid>
@@ -656,7 +710,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="8">
+                            CornerRadius="{DynamicResource RadiusLg}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -724,7 +778,7 @@
                                                     Background="{DynamicResource SurfaceBrush}"
                                                     BorderBrush="{DynamicResource AccentBrush}"
                                                     BorderThickness="2"
-                                                    CornerRadius="8" />
+                                                    CornerRadius="{DynamicResource RadiusLg}" />
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
@@ -758,7 +812,7 @@
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="Padding" Value="8,4" />
-        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontSize" Value="{DynamicResource FontCaptionSize}" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
             <Setter.Value>
@@ -766,7 +820,7 @@
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="4"
+                            CornerRadius="{DynamicResource RadiusSm}"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <ContentPresenter Content="{TemplateBinding Content}"
@@ -812,7 +866,7 @@
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="6"
+                            CornerRadius="{DynamicResource RadiusMd}"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <StackPanel IsItemsHost="True" />
@@ -836,7 +890,7 @@
                     <Border x:Name="MenuItemBorder"
                             Background="{TemplateBinding Background}"
                             Padding="{TemplateBinding Padding}"
-                            CornerRadius="4">
+                            CornerRadius="{DynamicResource RadiusSm}">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -986,7 +1040,7 @@
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="6">
+                            CornerRadius="{DynamicResource RadiusMd}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
