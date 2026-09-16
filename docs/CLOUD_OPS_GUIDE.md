@@ -19,12 +19,19 @@
 
 ### 当前配置的三个关键值（都在 systemd 环境变量里）
 
-| 用途 | 当前值 |
-|------|--------|
-| 团队工作区 ID | `11111111-1111-1111-1111-111111111111` |
-| 登录口令（所有人共用） | `cccalendar-team-2026` |
+> **口令与密钥不再写入本文档。** 本仓库为公开仓库，把明文口令提交进去等于对全网公开。
+> 实际值用下面这条命令从服务器 systemd 配置读取（只有登录服务器的人能看到）：
+>
+> ```bash
+> grep -E 'SharedSecret|SigningKey' /etc/systemd/system/cccalendar.service
+> ```
+
+| 用途 | 取值方式 |
+|------|----------|
+| 团队工作区 ID | `11111111-1111-1111-1111-111111111111`（非机密，可明文） |
+| 登录口令（所有人共用） | `Authentication__DevToken__SharedSecret`，见上方命令；经私密渠道单独发给成员 |
 | 开发令牌有效期 | 7 天（10080 分钟） |
-| 令牌签名密钥 | `cccalendar-cloud-signing-2026-0821-a1b2c3d4`（改了它 = 全员令牌失效，需重新登录） |
+| 令牌签名密钥 | `Authentication__DevToken__SigningKey`，见上方命令（改了它 = 全员令牌失效，需重新登录） |
 
 ### 团队成员（DevToken 按姓名派生用户 ID，姓名必须一字不差）
 
@@ -164,7 +171,7 @@ systemctl start cccalendar
 ```powershell
 $base = "http://47.120.6.126:5080"
 $ws = "11111111-1111-1111-1111-111111111111"
-$login = Invoke-RestMethod -Method Post -Uri "$base/api/auth/dev-token" -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes((@{ name = "admin"; sharedSecret = "cccalendar-team-2026" } | ConvertTo-Json)))
+$login = Invoke-RestMethod -Method Post -Uri "$base/api/auth/dev-token" -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes((@{ name = "admin"; sharedSecret = $teamSecret } | ConvertTo-Json)))
 $headers = @{ Authorization = "Bearer $($login.accessToken)" }
 $json = @{ name = "新会议室名"; timeZoneId = "China Standard Time" } | ConvertTo-Json
 Invoke-RestMethod -Method Post -Uri "$base/api/workspaces/$ws/rooms" -Headers $headers -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($json))
@@ -177,7 +184,7 @@ Invoke-RestMethod -Method Post -Uri "$base/api/workspaces/$ws/rooms" -Headers $h
 ```powershell
 $base = "http://47.120.6.126:5080"
 $ws = "11111111-1111-1111-1111-111111111111"
-$login = Invoke-RestMethod -Method Post -Uri "$base/api/auth/dev-token" -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes((@{ name = "admin"; sharedSecret = "cccalendar-team-2026" } | ConvertTo-Json)))
+$login = Invoke-RestMethod -Method Post -Uri "$base/api/auth/dev-token" -ContentType "application/json" -Body ([System.Text.Encoding]::UTF8.GetBytes((@{ name = "admin"; sharedSecret = $teamSecret } | ConvertTo-Json)))
 $headers = @{ Authorization = "Bearer $($login.accessToken)" }
 
 # 全部房间
@@ -229,7 +236,7 @@ systemctl daemon-reload && systemctl restart cccalendar
 | 服务端地址 | `http://47.120.6.126:5080/` |
 | OIDC 各项 | **全部留空** |
 | 开发令牌姓名 | 自己的真实姓名（如 `周家丞`，**一字不差**） |
-| 开发令牌口令 | `cccalendar-team-2026` |
+| 开发令牌口令 | 团队共享口令（见 §1 的取值方式，经私密渠道获取） |
 
 3. 点"登录团队"，状态显示"已登录"即成功（工作区 ID 自动回填，不用手填）。
 
@@ -268,7 +275,7 @@ C:\Users\<用户名>\AppData\Local\cccalendar\
 | 症状 | 先查什么 | 处理 |
 |------|---------|------|
 | 登录报"连接尝试失败/超时" | 开发机 `Invoke-RestMethod http://47.120.6.126:5080/health` | 通→客户端网络问题；不通→查服务器 2.2 和安全组 5080 |
-| 登录报 401 | 口令是否输错、姓名是否带空格 | 按 4.1 核对口令 `cccalendar-team-2026` |
+| 登录报 401 | 口令是否输错、姓名是否带空格 | 按 4.1 核对口令（见 §1 取值方式） |
 | 看板房间列还是本地默认 | 是否已登录团队（设置页状态） | 重新登录；登录后看板约 1 秒刷新 |
 | 看板占用块不出现 | 另一台电脑是否真保存了带会议室的日程 | 用场景 D 从开发机查当天预约确认 |
 | 弹"在线预约冲突" | 该时段该会议室是否已被占用 | 悬停灰色块看是谁约的，换时段或换会议室 |
@@ -280,6 +287,6 @@ C:\Users\<用户名>\AppData\Local\cccalendar\
 ## 6. 安全提醒（现状与边界）
 
 - 现状是 **HTTP 明文 + 姓名口令登录**，适用于团队验收期/内网级信任环境；
-- 口令 `cccalendar-team-2026` 只发给团队成员，泄露后按场景 F 更换；
+- 团队共享口令只发给团队成员，经私密渠道传递，**不要写进公开仓库、文档或群公告**；泄露后立即按场景 F 更换；
 - 长期正式使用前需升级：域名 + HTTPS（Let's Encrypt）+ OIDC 正式登录，届时关闭 DevToken（已在 WORKLIST 排期）；
 - 服务器 SSH 密码不要与团队口令相同；安全组只保留 22/5080 两个端口。

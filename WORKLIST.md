@@ -4,6 +4,16 @@
 
 ## 当前检查点
 
+- 2026-09-16：本轮 4 项 bug 修复（TDD 逐项 Red→Green→Verify），云端环境（阿里云 ECS 47.120.6.126:5080）已就绪：
+  - B-01 快速新增导入会议室模糊匹配 ✅ 完成：`TencentMeetingInvitationParser.MatchRoom` 在原有两层（双向包含、整体单字符插入）之上新增第三层——房间名删一个字符的变体被包含在地点文本中即命中，覆盖"佛山西樵财务三楼会议室"→"财务部三楼会议室"。Red 1 失败 → Green Core 解析器测试 10/10。
+  - B-02 日历会议显示位置错误（8 小时偏移）✅ 完成：根因——`ProviderAiAssistantClient.GetDateTimeOffset` 用 `DateTimeStyles.RoundtripKind` 把模型误标 Z 的本地墙钟时间按 UTC 解析，而系统提示只给无时区本地时间（本机 DB 中 3 条 TZ="Asia/Shanghai" 的"每日例会"存为 10:10 UTC=北京 18:10 为证据；QuickAdd/团队预约/云镜像路径时区均验证正确）。修复：新增 `GetZonedDateTimeOffset`——解析结果显式零偏移且 timeZoneId 偏移非零时按该时区墙钟时间重新锚定（须用 `GetUtcOffset(DateTimeOffset)` 重载，`GetUtcOffset(DateTime)` 对 Utc Kind 恒返回零）；`WriteAiToolCatalog` propose_timed_event 描述明确要求本地时间带偏移、禁止 Z/UTC。Red 1 失败 → Green Infrastructure AI 测试 21/21。
+  - B-03 桌面日历不显示 ✅ 完成：根因——本机 `settings.json` `desktopWorkbenchAppearance.opacity=0.10730593607306027`（10.7% 近乎全透明），且设置页滑杆无整数吸附，拖动/滚轮产生任意小数漂移。修复：`AppearanceSettingsViewModel.OpacityPercent` 写入时 `Math.Round` 取整（Red 1 失败 → Green VM 测试 4/4）；`SettingsView.xaml` 滑杆加 `IsSnapToTickEnabled="True"`；本机 settings.json 该值重置为 0.95（应用未运行时直接改文件）。
+  - B-04 快速新增待办无四象限选择 ✅ 完成：`QuickAddRequest` 增加 `TodoQuadrant? Quadrant` 可选参数；`QuickAddWindow` 待办类型显示"四象限"下拉（不指定/重要且紧急/重要不紧急/紧急不重要/不重要不紧急，第 0 项为不指定），`TryBuildRequests` Todo 分支携带选择，`CalendarDataService.QuickAddAsync` 经 `CreateTodo` 创建后应用 `MoveToQuadrant`（不指定时保持默认 IsImportant=false/IsUrgentOverride=null）。Red：Infrastructure CS1739 编译失败 + Desktop CS1061 编译失败 → Green：CalendarDataService 测试 15/15、QuickAddWindow 运行时测试 9/9。
+  - 历史数据提示：本机 DB 中 3 条 TZ="Asia/Shanghai" 的"每日例会"（存为 10:10 UTC=北京 18:10）为 AI 误标 Z 产生的历史偏移数据，可选择删除或手动改期；新创建的日程已不受影响。
+  - 完整回归：2026-09-16 `eng\verify.cmd` 通过，format check 通过、build 0 警告 0 错误、测试 479/479（Core 93、Infrastructure 104、Desktop 238、Server 44；基线 474 + 本轮新增 5）。
+- 2026-09-16：版本 0.6.6 安装包构建并发布完成（含上述 4 项 bug 修复 + 本机 settings.json `apiBaseUrl` 前导空格清理）：`eng\publish.cmd` 完整回归 479/479、Release 发布与启动冒烟通过；首次构建时发现 `installer\cccalendar.iss` 的 AppVersion 独立于 csproj（曾产出误命名的 0.6.5 包，已删除重编），两处版本号已同步为 0.6.6。产物 `artifacts\installer\cccalendar-0.6.6-win-x64-setup.exe` 60,145,895 bytes，SHA-256 `5EC5032FB95EAD42622E7F2115BE9ABBE5DBE6E6F92C63209026F38452C2371B`；已按 OSS_RELEASE_GUIDE 上传安装包与根目录 `version.json`（先包后清单），公网校验通过：清单返回 0.6.6、SHA-256 一致、安装包 HEAD 200 Content-Length 60,145,895。其他电脑可通过“检查更新”或重新安装升级。
+- 2026-09-16：**新增 P60 UI 优化阶段（方案已出，待裁决后开工）**。方案文档 [docs/UI_OPTIMIZATION_PLAN.md](docs/UI_OPTIMIZATION_PLAN.md)；本阶段借鉴 `D:\github_program\deepseek-harness\web-ui-extract` 的设计令牌纪律（三层令牌、抬高面描边即首层阴影、状态色单源派生、滚动条间接重绑、动效 120/160ms、容器驱动布局），明确拒绝其会话壳/气泡/大圆角/渐变/星光图标/阅读栏宽度轴。实测体检结论：`Themes\Theme.xaml` 只有 30 个资源键，**间距/圆角/字号/动效令牌全部缺失**（圆角 6 种字面量、硬编码字号 112 处/23 文件、硬编码颜色 33 处）；其中 `Views\RoomBookingBoardControl.cs` 独占 18 处硬编码颜色，导致**深色主题下会议室看板仍是白底、桌面组件的主题/颜色/透明度设置对看板完全无效**——这是本阶段最高价值项。另发现潜在缺陷：`Theme.xaml:29` 引用的 `{DynamicResource UiTextEffect}` 在全仓均未声明（仅 `DesktopAppearanceController.cs:66` 对桌面窗口注入），主窗口与普通页面解析为空。切片 P60-01…P60-06 见文件末尾 P60 章节；每片独立验收，P60-01 只加令牌不改页面引用以保证观感零变动。**当前无代码改动，未运行回归；开工前需先裁决 Q1（按钮圆角 8px vs 4px）、Q2（看板时段）、Q3（`UiTextEffect` 处置）。**
+- 2026-08-31：新增 [VERSION_EVOLUTION_PLAN.md](docs/VERSION_EVOLUTION_PLAN.md)，整理前面指定的第 2、3、4、5、7 项版本跨越路线；会议室单字符模糊匹配已完成并通过完整回归，后续不再作为路线图待办。
 - 2026-08-24：P21 会议室预约人展示客户端实现完成，`eng\\publish.cmd` 完成完整回归 454/454、Linux Server 自包含发布和 Windows 安装包构建；0.5.1 安装包已覆盖上传 OSS，公网清单/HEAD 校验通过。Linux Server 包已上传至 ECS，保留 `/root/cccalendar/data` 后替换并重启 `cccalendar`；本机和公网 `/health` 均返回 `status: ok`。
 - 2026-08-24：P22 修复团队登录启动恢复（读取 Windows 凭据，开发令牌过期自动续签）与本地带会议室日程补同步（稳定幂等键）；完整回归 456/456。待重新生成并上传 0.5.1 安装包。
 - 2026-08-24：P22 安装包重新生成并覆盖上传完成；`cccalendar-0.5.1-win-x64-setup.exe` 60,124,103 bytes，SHA-256 `8e1efd68510b832bc345718229a1571e6e205801906deef5999b486a73531cf9`；公网清单和安装包 HEAD/长度校验通过。
@@ -41,7 +51,7 @@
 - 最近验证：2026-08-23，`eng\verify.cmd` 通过，完整回归 414/414（Core 88、Infrastructure 93、Desktop 191、Server 42），build 0 警告/0 错误；本轮未重新生成或上传安装包。
 - 2026-08-23：更新图标改用蓝色 `PrimaryButtonStyle`，保持新版本可用时清晰可见；快速新增窗口改为非模态 `Show()`，创建/取消使用显式 `Close()`，关闭后异步保存请求并防止重复打开。
 - 最近验证：2026-08-23，`eng\verify.cmd` 通过，完整回归 414/414（Core 88、Infrastructure 93、Desktop 191、Server 42），build 0 警告/0 错误；本轮未重新生成安装包。
-- 唯一下一步：继续 P15-09d 两地云端验收；本轮无阻塞项。
+- 唯一下一步（2026-09-16 起）：**先裁决 Q1/Q2/Q3，再开工 P60-01 令牌基线**（新增设计令牌，不改页面引用，验收以「完整回归 479/479 + 新增契约测试通过 + 观感零变动」为准）；P15-09d 两地云端验收与生产 HTTPS/OIDC 为长期并行事项，见 P40/P47。本轮无阻塞项。
 
 - 当前阶段：P16 快速新增/看板/桌面组件增强（P16-04~07 完成）
 - 当前状态：P16 已发布，后续云端验收与生产 HTTPS/OIDC 仍是长期事项；本轮 P18 变更已在上方检查点记录。
@@ -897,7 +907,7 @@ Verify：完整验证命令、结果、必要的人工检查
   - 子切片 c) 完成：WPF 看板接线——`TeamRoomBoardSnapshot`/`TeamRoomBoardMapper`（RoomId→房间名映射，停用房间过滤）、`RoomBookingPicker` 团队加载器（日期切换重拉、世代号防陈旧回写、加载失败保持本地视图、`RoomsChanged` 事件）、`QuickAddWindow` 房间下拉跟随团队目录、`TeamRoomBookingSubmissionResolver` 从 QuickAddRequest 解析可提交预约、`MainWindow` 保存日程后同步提交在线预约（冲突弹窗且本地日程保留）、`StoredTokenAccessTokenProvider`（凭据存储直读令牌）与 App.xaml.cs 接线（HttpClient 按服务端地址缓存）。
   - Verify（c 切片）：`eng\verify.cmd` 通过，构建 0 警告/0 错误；Core 80、Infrastructure 88、Desktop 170、Server 39，共 377 项；`dotnet format` verify 通过。
   - 待办 d) 实机跨电脑验收：两台同网段电脑按 [LAN_DEPLOYMENT.md](docs/LAN_DEPLOYMENT.md) 部署——服务器启用 DevToken + PostgreSQL/file 存储，两台客户端分别用姓名登录同一工作区，验证 A 电脑提交预约后 B 电脑看板可见、同时段互约 409、重启后仍可见。
-  - 进展 d)（2026-08-22，改走云服务器）：因两地办公不同网段（LAN 直连不通），购买阿里云 ECS e-c1m1.large（2C2G Ubuntu 22.04，公网 47.120.6.126）；`cccalendar-server-linux.zip`（linux-x64 自包含）上传部署，systemd 守护（`/etc/systemd/system/cccalendar.service`，`Restart=always`，DevToken 启用 + SigningKey + WorkspaceId + SharedSecret 环境变量），安全组放行 SSH 22/TCP 5080；公网 `/health` ok；UTF-8 建房 3 间（云会议室A/B/C，乱码数据已清空 `data` 目录重建）；公网验证无口令/错口令登录均 401。**剩余**：两地客户端装 0.3.3，服务端地址 `http://47.120.6.126:5080/` + 口令 `cccalendar-team-2026` 登录（A=张三/B=李四），跑互见/冲突/持久化三场景。
+  - 进展 d)（2026-08-22，改走云服务器）：因两地办公不同网段（LAN 直连不通），购买阿里云 ECS e-c1m1.large（2C2G Ubuntu 22.04，公网 47.120.6.126）；`cccalendar-server-linux.zip`（linux-x64 自包含）上传部署，systemd 守护（`/etc/systemd/system/cccalendar.service`，`Restart=always`，DevToken 启用 + SigningKey + WorkspaceId + SharedSecret 环境变量），安全组放行 SSH 22/TCP 5080；公网 `/health` ok；UTF-8 建房 3 间（云会议室A/B/C，乱码数据已清空 `data` 目录重建）；公网验证无口令/错口令登录均 401。**剩余**：两地客户端装 0.3.3，服务端地址 `http://47.120.6.126:5080/` + 团队共享口令（见 docs/CLOUD_OPS_GUIDE.md §1 取值方式）登录（A=张三/B=李四），跑互见/冲突/持久化三场景。
 - [x] P15-10 公网 DevToken 安全加固（共享口令）
   - 背景：上公网后“只凭姓名发令牌”会被陌生人冒领，登录端点增加共享口令防线。
   - Red：Server 测试覆盖配置了 SharedSecret 后无口令/错口令登录 401、对口令登录成功；客户端测试覆盖登录请求携带口令字段。
@@ -1066,6 +1076,71 @@ Verify：完整验证命令、结果、必要的人工检查
 | 2026-08-24 | 腾讯会议邀请兼容“会议名称/中文年月日/会议地点/链接附会议号”格式；桌面组件右键菜单新增“鼠标穿透”切换 | Red：新增解析器、快速新增运行时和右键菜单测试先失败；Green：扩展解析正则并接入三个桌面组件的现有鼠标穿透控制；Verify：`eng\verify.cmd` 通过，Core 90/90、Desktop 209/209、Infrastructure 97/97、Server 42/42，0 警告/0 错误 | 待用户验收 |
 
 ## P19 - AI 助理体检后续（见 docs/ASSISTANT_WORKLIST.md）
+
+## P60 - UI 优化（借鉴 deepseek-harness Web UI 设计语言）
+
+> 方案文档：[docs/UI_OPTIMIZATION_PLAN.md](docs/UI_OPTIMIZATION_PLAN.md)（编写于 2026-09-16，待用户确认 Q1–Q4 后开工）
+> 参考实现：`D:\github_program\deepseek-harness\web-ui-extract`
+> 基线：2026-09-16 完整回归 479/479（Core 93、Infrastructure 104、Desktop 238、Server 44）
+
+体检结论（已实测，作为本阶段的动机与验收对照）：
+
+- `Themes\Theme.xaml` 仅声明 30 个资源键（16 画刷 + 9 命名样式 + 3 个 `sys:Double` + 1 转换器）；**间距、圆角、字号、动效令牌为 0 个**。
+- 圆角靠字面量：`2`×3、`3`×3、`4`×8、`5`×1、`6`×4、`8`×4。
+- 硬编码字号 112 处、分布于 23 个文件；硬编码十六进制颜色 33 处，其中 `Views\RoomBookingBoardControl.cs` 独占 18 处。
+- `Theme.xaml:29` 引用 `{DynamicResource UiTextEffect}`，该键在 `Theme.xaml`/`DarkTheme.xaml` 中均未声明，仅 `Desktop\DesktopAppearanceController.cs:66` 对桌面窗口注入 → 主窗口与普通页面解析为空（潜在缺陷，待 Q3 裁决）。
+
+- [ ] P60-01 令牌基线：在 `Theme.xaml` 新增全部令牌（间距 `SpacingXs/Sm/Md/Lg/Xl`、圆角 `RadiusSm/Md/Lg`、字号 `FontCaptionSize/FontCompactSize/FontPanelTitleSize/FontPageTitleSize/FontClockSize`、控件尺寸 `ControlHeightPrimary/IconButtonSize/SidebarWidth/BrandBarHeight/NavigationItemHeight`、动效 `MotionFast/MotionBase/EasingStandard`、新增语义画刷 `ScrollbarThumbBrush/ScrollbarThumbHoverBrush/FocusRingBrush/OverlayScrimBrush/ElevationPanelBrush`），`DarkTheme.xaml` 同步覆写颜色键。**本切片不改任何页面引用**，观感必须与改动前一致。
+  - Red：新增契约测试 `ThemeDeclaresEveryReferencedDynamicResourceKey`（解析 `Theme.xaml` 中所有 `{DynamicResource X}` 引用，断言每个键都在 `Theme.xaml` 或 `DarkTheme.xaml` 中有声明）——预期先因 `UiTextEffect` 未声明而失败，据此把该缺陷固化为可见事实。
+  - Green：补齐令牌声明；按 Q3 裁决处置 `UiTextEffect`（补默认值或移除该 Setter）。
+  - Refactor：令牌分组加注释，与 `docs/UI_DESIGN.md` §2 的章节一一对应；不引入 `<Color>` 资源或新的令牌机制（沿用现有 `<sys:Double>` 与 `SolidColorBrush`）。
+  - Verify：`eng\verify.cmd` 退出 0；新增契约测试通过；`UiDesignContractTests` 34 项全通过；`[x]` 完成后把新令牌表写入 `docs/UI_DESIGN.md` §2。
+  - 约束：**只新增、不改名、不删除**现有 30 个资源键（页面全部用 `DynamicResource` 引用，改名会静默回退系统默认样式）。
+
+- [ ] P60-02 主题控件接入令牌：`Theme.xaml` 内 24 个隐式样式与 9 个命名样式（含 `PrimaryButtonStyle`、`IconButtonStyle`、`NavigationItemStyle`、`SegmentToggleStyle`）由字面量改用令牌；按 Q1 裁决处理普通按钮圆角。
+  - Red：新增契约测试断言 `Theme.xaml` 中不再出现非令牌的 `CornerRadius="N"` 与样式级 `FontSize="N"` 字面量（模板内的结构性尺寸除外）。
+  - Green：逐样式替换为 `{DynamicResource ...}`/`{StaticResource ...}` 令牌引用。
+  - Refactor：`CaptionTextStyle`/`SectionTitleStyle`/`PageTitleStyle` 改为引用字号令牌，消除同义尺寸的第二处定义。
+  - Verify：`eng\verify.cmd` 退出 0；`HorizontalScrollBarKeepsLogicalLeftToRightDirection`、`ComboBoxTemplateSupportsMouseToggleAndEditableInput` 等模板断言仍通过；三档分辨率截图与 P60-01 后逐像素对比，差异仅限预期项。
+
+- [ ] P60-03 会议室看板主题化（本阶段最高价值）：新增 `ViewModels\RoomBoardPalette.cs`（纯数据、无 WPF 依赖、可单测），`Views\RoomBookingBoardControl.cs` 的 18 处硬编码颜色改为「按语义令牌构建色板 + 解析失败回落原字面量」；冻结画笔缓存改为按色板实例缓存。
+  - Red：新增 `RoomBoardPaletteTests`——覆盖「令牌缺失时回落到当前默认色板」「深色主题下返回深色色板」；实现前因 `RoomBoardPalette` 不存在而编译失败。
+  - Green：控件经 `TryFindResource` 解析语义令牌构建色板；几何常量（`CellHeight=18`、`RoomWidth=125`、`FirstVisibleCell=16`）与命中测试**保持不变**。
+  - Refactor：状态色单源——占用灰/本人蓝/空闲绿/冲突红各只保留一个基准色，由其派生底/边/字，消除功能色在 `Theme.xaml` 与控件内的两份来源。
+  - Verify：`RoomBookingBoardTests` 16/16 仍通过（几何与状态语义无回归）；**深色主题下看板截图**（当前为白底，改后应为深色）与浅色截图各一张；`eng\verify.cmd` 退出 0。
+  - 附带收益：桌面组件已由 `DesktopAppearanceController.cs:43-73` 重绑窗口级语义键，看板改读语义键后**自动跟随组件的主题与颜色设置**。
+  - 变量：按 Q2 裁决决定可见时段是否仍为 08:00–24:00。
+
+- [ ] P60-04 看板可读性与状态表达：看板文字与背景对比度不低于 4.5:1；评估看板字号由 11px 提到 `FontCaptionSize`（12px，行高 18px 可容纳）；本人预约增加左侧 3px 竖条（与导航选中项同一语法），使「本人/他人」不只靠颜色区分（`UI_DESIGN.md` §2.3）。
+  - Red：新增契约测试断言看板文字色与其背景色的对比度满足阈值；断言本人占用块存在独立于颜色的视觉标记。
+  - Green：按上表调整色板派生与绘制。
+  - Refactor：为深色主题单独校验对比度，不用同一组派生系数（深色底需更高亮度差）。
+  - Verify：浅色/深色各一张看板截图人工核验；`eng\verify.cmd` 退出 0。
+
+- [ ] P60-05 页面字面量清理：`RecordView.xaml:12`、`ProjectView.xaml:12`、`StatisticsView.xaml:14` 的 `FontSize="20" FontWeight="SemiBold"` 改用 `PageTitleStyle`；`CalendarView.xaml`/`RoomBookingPicker.xaml` 等处 `FontSize="11"` 次要文字改用 `CaptionTextStyle`；`MainWindowViewModel.cs:19-30` 助理导航 `PackIconLucideKind.Sparkles` 换为非星光图标（`UI_DESIGN.md` §1.6）；`RegionSelectorWindow.xaml` 的 `#33000000`/`#11FFFFFF` 改用 `OverlayScrimBrush`；`MeetingDetailsWindow.xaml`/`MeetingExportWindow.xaml` 的硬编码 `White` 与 `FontSize="18"` 改用语义样式。
+  - Red：新增契约测试断言页面不出现硬编码页面标题字号，且助理导航不使用 `Sparkles`。
+  - Green：逐处替换为语义样式/令牌。
+  - Refactor：只替换等价观感的写法，不顺手重排布局。
+  - Verify：`eng\verify.cmd` 退出 0；`UiDesignContractTests` 全通过；受影响的会议详情/导出窗口截图核验。
+
+- [ ] P60-06 视觉验收与文档同步：按 `UI_DESIGN.md` §9 核验 **1920×1080、1366×768**，本轮补充 **980×640**（`MainWindow` 的 `MinWidth/MinHeight`）；桌面组件另验浅色/深色/复杂壁纸背景；检查无文字截断、控件位移、重叠、卡片套卡片、装饰渐变；键盘焦点/悬停/禁用/错误/选中状态完整。
+  - Verify：`eng\verify.cmd` 退出 0；截图集归档到 `artifacts\`；`docs\UI_DESIGN.md` §2 令牌表与实现一致；`docs\USER_GUIDE.md` 中受影响的界面描述已更新；本文件状态、验证证据与唯一下一步已同步。
+
+- 未决问题（开工前需用户裁决，详见方案文档 §4.3 与 §8）：
+  - Q1 普通按钮圆角保持 8px（纯令牌化，零回归）还是改为 `RadiusSm=4` 以严格符合 `UI_DESIGN.md` §2.2（会变动全部按钮观感）？
+  - Q2 会议室看板可见时段保持 08:00–24:00，还是收窄为工作时段？
+  - Q3 `UiTextEffect` 未定义：补默认值（全应用打开文字描边）还是移除该 Setter（把描边明确限定为桌面组件特性）？
+  - 本阶段**不改**：业务逻辑、HTTP 契约、`RoomBookingBoard` 几何与命中测试、28 个 XAML 页面的整体重写、技术栈。
+
+## P40 - 版本跨越方案（聚焦 2、3、4、5、7）
+
+- [x] P40-01 方案文档：新增 [docs/VERSION_EVOLUTION_PLAN.md](docs/VERSION_EVOLUTION_PLAN.md)，记录增量同步与 cursor、云端一致性、安全身份、AI 助手、工程质量/可观测性/发布体系的目标、分阶段交付和验收门槛。
+- [x] P40-02 会议室名称识别：地点名与配置房间名允许恰好一个字符插入/缺失；新增回归测试，`dotnet test CcCalendar.sln --no-restore` 完整回归 474/474 通过。
+- [ ] P41 增量同步与离线恢复：补充 cursor 分页/过期快照、Outbox 持久化重试和断网恢复验收。
+- [ ] P44 云端一致性：补充对象版本冲突、幂等重放、事务回滚、迁移和备份恢复验收。
+- [ ] P47 生产安全：域名 HTTPS/OIDC、角色矩阵、令牌撤销和关闭生产 DevToken。
+- [ ] P50 AI 可靠性：固定评测集、Provider 错误恢复、工具调用追踪和数据范围校验。
+- [ ] P53 发布体系：CI 闸门、结构化日志/指标、安装包签名、灰度发布和回滚演练。
 
 ## P23 - AI 重复会议创建与会议室同步
 
