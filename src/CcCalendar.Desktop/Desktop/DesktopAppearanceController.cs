@@ -63,6 +63,11 @@ public sealed class DesktopAppearanceController
         window.Resources["UiBodyFontSize"] = value.FontSize * value.Scale;
         window.Resources["UiControlHeight"] = 32 * value.Scale;
         window.Resources["UiCompactControlHeight"] = 28 * value.Scale;
+        // 桌面组件的紧凑文字（月历格日期角标、农历、日程条）此前是固定 9/10px，
+        // 不跟随「字体大小 / 界面缩放」——只有正文标题会变。改为按比例派生：
+        // 既保留紧凑表面的层级（角标 < 农历 < 正文），又让设置对所有文字生效。
+        window.Resources["DesktopCaptionFontSize"] = DesktopFontScale.Caption(value.FontSize, value.Scale);
+        window.Resources["DesktopMicroFontSize"] = DesktopFontScale.Micro(value.FontSize, value.Scale);
         window.Resources["UiTextEffect"] = CreateTextEffect(value.ShowTextOutline, palette);
         window.Resources["SurfaceBrush"] = window.Resources["DesktopSurfaceBrush"];
         window.Resources["TextPrimaryBrush"] = window.Resources["DesktopPrimaryTextBrush"];

@@ -1182,6 +1182,16 @@ Verify：完整验证命令、结果、必要的人工检查
   - 未在本切片做的部分（明确记录）：`View` 级的区块间距（`Margin="24,20,24,28"` 这类）未逐一重排。逐页调整 28 个文件的间距属于高回归风险、低可验证性的工作，且截图显示当前各页留白已可接受；若后续仍需调整，应逐页单独切片并用截图对比。
   - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **514/514**（Core 93、Infrastructure 104、Desktop 273、Server 44）。
 
+## P64 - 桌面组件紧凑字号跟随缩放设置（调查中发现并修复）
+
+- [x] P64 桌面组件的紧凑文字此前**不跟随**「字体大小 / 界面缩放」设置。
+  - 问题：`DesktopComponentWindow`/`DesktopWorkbenchWindow` 的月历格日期角标、农历与日程条用**固定** 9/10/11px，而同一窗口的正文由 `DesktopAppearanceController` 的 `window.FontSize = value.FontSize * value.Scale` 驱动。后果是用户拖动桌面组件的字号/缩放滑杆时**只有正文变化，格子里的文字纹丝不动**——这不是观感问题，而是设置项对部分内容不生效。
+  - 修法：新增 `Desktop\DesktopFontScale.cs`，把"更小"表达为**相对倍数**（`CaptionRatio = 0.86` 对应原 11/12px，`MicroRatio = 0.71` 对应原 9/10px，`MinimumFontSize = 8` 下限）。`DesktopAppearanceController` 在写入 `UiBodyFontSize` 时一并计算 `DesktopCaptionFontSize` / `DesktopMicroFontSize` 两个资源；`DesktopComponentWindow`/`DesktopWorkbenchWindow` 的 10 处固定字号改用这两个 `DynamicResource`。
+  - 效果：所有文字一起缩放，紧凑表面的层级比例（角标 < 农历 < 正文）保持不变；默认设置下还原成原先的量级（角标 ≈9.94、农历 ≈12.04）。
+  - **刻意未改**：`QuickPanelWindow` 的 9/10 保持固定。它是 420×640 的托盘固定尺寸面板，**不经过 `DesktopAppearanceController`**，因此这两个资源在它那里不存在——若也改成 `DynamicResource`，解析失败反而会让字号回退、文字变异，属于引入回归。
+  - 注入顺序已核对：组件窗口在 `App` 的 L124/L134 构造，`ApplyDesktopAppearance` 在 L225 交给 `AppearanceSettingsViewModel` 并在显示前调用（组件在 L308+ 才 `Show()`），且 `DynamicResource` 在窗口加载时解析，因此资源先于首次渲染就位。
+  - 验证方式：单元测试 5 项覆盖派生规则（默认值还原、层级次序、跟随字号、跟随缩放、下限）；另以隔离数据目录**实机启动并开启桌面日历组件**，确认进程存活、无 `crash.log`、UI Automation 枚举到 2 个可见顶层窗口（主窗口 + 桌面组件），说明 `DynamicResource` 已正确解析而非回退。
+  - Verify：`eng\verify.cmd` 退出 0；build **0 警告 0 错误**；完整回归 **520/520**（Core 93、Infrastructure 104、Desktop 279、Server 44）。
 ## P63 - 文档陈旧与安全清理
 
 - [x] P63-01 校正陈旧版本号与已过时的状态描述（影响判断的优先修）。
