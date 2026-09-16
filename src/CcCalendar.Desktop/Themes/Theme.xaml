@@ -176,7 +176,13 @@
     <CubicEase x:Key="EasingStandard" EasingMode="EaseInOut" />
 
     <sys:Double x:Key="UiBodyFontSize">14</sys:Double>
-    <sys:Double x:Key="UiControlHeight">32</sys:Double>
+    <!--
+        普通控件高度（P61-06b）：32 → 36，向"主要输入 36px"档对齐。
+        参考实现的菜单项最小高 40、弹窗内边距 24，整体留白明显大于本项目；
+        本项目历史上是 32/28 两档偏紧凑。这里先把正文控件抬到 36，
+        紧凑档（28）保持不变，用于工具栏与分段控件。
+    -->
+    <sys:Double x:Key="UiControlHeight">36</sys:Double>
     <sys:Double x:Key="UiCompactControlHeight">28</sys:Double>
 
     <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />

@@ -5,9 +5,14 @@
              AutomationProperties.Name="会议室时间视图区">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
+            <!--
+                第 0 行固定 32（紧凑档）、第 2 行固定 26（表头）。看板顶边 = 32 + 8 + 26 = 66，
+                这一几何被 RoomBookingPickerRuntimeTests 当作契约断言。显式钉住行高，
+                避免全局 UiControlHeight 调整（P61-06b 由 32 抬到 36）把看板整体推下去。
+            -->
+            <RowDefinition Height="32" />
             <RowDefinition Height="8" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="26" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid>
@@ -18,9 +23,17 @@
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
+            <!--
+                日期导航行（P61-06b）：按紧凑档固定高度 32。
+                这一行的高度直接决定看板顶边的 y 坐标，而 RoomBookingPickerRuntimeTests
+                把「板顶边 = 顶部按钮行(32) + 8 间隙 + 表头行(26) = 66」当作契约断言。
+                全局把 UiControlHeight 抬到 36 后此处会长高 4px、把看板整体下移，
+                因此显式钉住紧凑档，保持看板几何不被全局留白调整牵连。
+            -->
             <RepeatButton x:Name="PreviousButton"
                           Grid.Column="1"
                           Width="32"
+                          Height="{DynamicResource UiCompactControlHeight}"
                           Margin="8,0,0,0"
                           AutomationProperties.Name="前一天"
                           Click="PreviousClick"
@@ -28,6 +41,7 @@
             <RepeatButton x:Name="NextButton"
                           Grid.Column="2"
                           Width="32"
+                          Height="{DynamicResource UiCompactControlHeight}"
                           Margin="4,0,0,0"
                           AutomationProperties.Name="后一天"
                           Click="NextClick"
@@ -40,6 +54,7 @@
             <Button x:Name="ExportButton"
                     Grid.Column="4"
                     MinWidth="84"
+                    Height="{DynamicResource UiCompactControlHeight}"
                     HorizontalAlignment="Right"
                     AutomationProperties.Name="导出当天会议"
                     Click="ExportClick"
