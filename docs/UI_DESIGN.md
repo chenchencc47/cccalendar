@@ -52,6 +52,56 @@
 
 强调色只用于选中状态、主操作、今天和焦点，不铺满整个界面。状态不能只靠颜色表达，还需要图标、文本或形状。
 
+### 2.4 设计令牌表（WPF 实现基线）
+
+令牌全部声明在 `src/CcCalendar.Desktop/Themes/Theme.xaml`，颜色类在 `Themes/DarkTheme.xaml` 中覆写；间距/圆角/字号/控件尺寸/动效为跨主题常量，只在浅色字典中声明一次。
+
+**间距**（`sys:Double`）：`SpacingXs` 4、`SpacingSm` 8、`SpacingMd` 12、`SpacingLg` 16、`SpacingXl` 24。
+
+**圆角**（必须是 `CornerRadius` 类型，不能是 `sys:Double`——见 §11 的类型陷阱）：`RadiusSm` 4、`RadiusMd` 6、`RadiusLg` 8。
+
+**字号**（`sys:Double`）：`FontCaptionSize` 12、`FontCompactSize` 13、`UiBodyFontSize` 14（正文）、`FontPanelTitleSize` 16、`FontPageTitleSize` 20、`FontClockSize` 32。
+
+**控件尺寸**（`sys:Double`）：`UiControlHeight` 32、`UiCompactControlHeight` 28、`ControlHeightPrimary` 36、`IconButtonSize` 32、`SidebarWidth` 200、`BrandBarHeight` 56、`NavigationItemHeight` 38。
+
+**动效**：`MotionFast` 120ms、`MotionBase` 160ms（均为 `Duration`），`EasingStandard`（`CubicEase`，EaseInOut）。
+
+**语义画刷**（浅色值 → 深色值由 `DarkTheme.xaml` 覆写）：
+
+| 令牌 | 用途 |
+|------|------|
+| `PageBackgroundBrush` / `SurfaceBrush` / `SubtleSurfaceBrush` / `ControlSurfaceBrush` | 页面与表面 |
+| `HoverBrush` / `PressedBrush` | 交互反馈 |
+| `TextPrimaryBrush` / `TextSecondaryBrush` | 文字层级 |
+| `BorderBrush` | 分隔线 |
+| `AccentBrush` / `AccentHoverBrush` / `AccentPressedBrush` / `AccentSubtleBrush` | 强调色四态 |
+| `SuccessBrush` / `WarningBrush` / `DangerBrush` | 功能色 |
+| `FocusRingBrush` | 键盘焦点环 |
+| `ScrollbarThumbBrush` / `ScrollbarThumbHoverBrush` | 滚动条 |
+| `OverlayScrimBrush` | 模态与区域选择遮罩 |
+| `ElevationPanelBrush` / `ElevationProminentBrush` | 抬高面板 |
+
+**会议室看板专用色**（自绘控件无法绑定 XAML，由 `ViewModels\RoomBoardPalette.cs` 解析，解析失败回落默认值）。这是看板颜色的**唯一来源**：
+
+| 令牌 | 浅色 | 深色 | 用途 |
+|------|------|------|------|
+| `RoomBoardGridSurfaceBrush` | `#FFFFFF` | `#22252A` | 空闲格底面 |
+| `RoomBoardGridHourBrush` | `#D9DEE5` | `#383D45` | 整点分隔线 |
+| `RoomBoardGridHalfHourBrush` | `#F0F2F5` | `#2C3038` | 半小时分隔线 |
+| `RoomBoardOccupiedFillBrush` | `#E4E7EA` | `#2F333A` | 他人占用底色 |
+| `RoomBoardOccupiedTextBrush` | `#5C6470` | `#A8AFB8` | 他人占用文字 |
+| `RoomBoardOwnedFillBrush` | `#DCEBFF` | `#1C2A38` | 本人占用底色 |
+| `RoomBoardOwnedTextBrush` | `#174A8B` | `#8FB8F0` | 本人占用文字 |
+| `RoomBoardAccentBarBrush` | `#174A8B` | `#8FB8F0` | 本人占用左侧 3px 标记条 |
+| `RoomBoardSelectedFreeFillBrush` | `#D8F0DF` | `#1C3A2A` | 选中且空闲底色 |
+| `RoomBoardSelectedFreeTextBrush` | `#1F5B3A` | `#7FCFA2` | 选中且空闲文字 |
+| `RoomBoardConflictFillBrush` | `#F9E0E3` | `#3A2026` | 选中但冲突底色 |
+| `RoomBoardConflictTextBrush` | `#8F2231` | `#F09AA5` | 选中但冲突文字 |
+| `RoomBoardHandleFillBrush` | `#FFFFFF` | `#22252A` | 选中块四角调节点填充 |
+| `RoomBoardPreviewFillBrush` | `#33246BCE` | `#335794E6` | 拖拽预览填充 |
+
+**约束**：看板文字与其底色的对比度必须 ≥ 4.5:1（WCAG AA），由 `ViewModels\ColorContrast.cs` 计算并在测试中断言。当前实测浅色 4.82 / 7.27 / 6.67 / 6.88，深色 5.73 / 7.15 / 6.72 / 6.98。
+
 ## 3. 主窗口布局
 
 ```text
@@ -157,3 +207,22 @@ AI 页面采用“工作记录 + 命令输入”，不用聊天应用样式：
 - 工具中心使用“时间工具、专注、截图与贴屏、剪贴板”四个页签，每次只显示一个工作区，不使用超高单页承载全部工具。
 - 四象限和看板列是布局区域，不使用页面底色制造嵌套卡片；只有任务等独立重复项可以使用主表面和边框。
 - AI 页面将每日计划、周报和撤销放在命令栏，将模型与读写权限放在独立上下文栏，最小窗口下不得挤在同一行。
+
+## 11. 令牌类型陷阱（WPF 特有，务必按此实现）
+
+`DynamicResource` 把资源值直接赋给目标属性，**不经过目标的类型转换器**；而资源字典里 `sys:Double` 的值是裸 `Double`。因此令牌的 CLR 类型必须与消费属性的类型一致，否则编译期无警告、运行时才炸：
+
+- **圆角必须声明为 `CornerRadius`**，不能用 `sys:Double`。`Border.CornerRadius` / `Button` 模板需要 `CornerRadius` 值，绑定 `sys:Double` 会在 `Arrange` 阶段抛 `InvalidCastException: Unable to cast object of type 'System.Double' to type 'System.Windows.CornerRadius'`。
+  正确写法：`<CornerRadius x:Key="RadiusSm">4</CornerRadius>`（属性语法，复用 WPF 内建的 `CornerRadius` 类型转换器）。
+- 间距/字号/尺寸用 `sys:Double` 是正确的，因为它们最终消费在 `double` 属性上（`Width`/`Height`/`FontSize`）。多值属性（`Margin`/`Padding`/`BorderThickness`）需要 `Thickness` 类型，不能直接用 `sys:Double`。
+- 时长用 `Duration`，缓动用 `CubicEase` 等具体类型，不要用字符串。
+- **每个主题令牌必须有契约测试断言「具体 CLR 类型」**，并且最好把令牌真正赋给一个目标控件并强制布局一次。「键存在」「值是某个数值」都不足以证明它能被目标属性消费。
+
+## 12. 视觉回归测试的可靠性要求
+
+改自绘控件或主题时，视觉断言必须确认「去掉修复后它会失败」，否则很可能是假通过：
+
+- `RenderTargetBitmap.Render(visual)` 会按该视觉在视觉树中的**偏移**作画。子控件不在 (0,0) 时（例如看板位于 44px 小时刻度列之后），直接渲染会在图中留下空带；需要先用 `VisualBrush` 包一层再从 (0,0) 重绘，或显式平移。
+- 目标视觉在 `InvalidateVisual()` 之后若没有重新参与一次渲染过程，`Render` 可能命中**缓存的旧内容**；`VisualBrush` 尤其会直接复用既有 bitmap cache。
+- 因此：断言渲染像素之前，先跑一次布局与 `DispatcherPriority.Render` 队列；并且优先选择「与真实启动路径一致」的构造顺序（例如先挂主题字典再构建视图）。
+

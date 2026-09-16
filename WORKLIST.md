@@ -12,6 +12,7 @@
   - 历史数据提示：本机 DB 中 3 条 TZ="Asia/Shanghai" 的"每日例会"（存为 10:10 UTC=北京 18:10）为 AI 误标 Z 产生的历史偏移数据，可选择删除或手动改期；新创建的日程已不受影响。
   - 完整回归：2026-09-16 `eng\verify.cmd` 通过，format check 通过、build 0 警告 0 错误、测试 479/479（Core 93、Infrastructure 104、Desktop 238、Server 44；基线 474 + 本轮新增 5）。
 - 2026-09-16：版本 0.6.6 安装包构建并发布完成（含上述 4 项 bug 修复 + 本机 settings.json `apiBaseUrl` 前导空格清理）：`eng\publish.cmd` 完整回归 479/479、Release 发布与启动冒烟通过；首次构建时发现 `installer\cccalendar.iss` 的 AppVersion 独立于 csproj（曾产出误命名的 0.6.5 包，已删除重编），两处版本号已同步为 0.6.6。产物 `artifacts\installer\cccalendar-0.6.6-win-x64-setup.exe` 60,145,895 bytes，SHA-256 `5EC5032FB95EAD42622E7F2115BE9ABBE5DBE6E6F92C63209026F38452C2371B`；已按 OSS_RELEASE_GUIDE 上传安装包与根目录 `version.json`（先包后清单），公网校验通过：清单返回 0.6.6、SHA-256 一致、安装包 HEAD 200 Content-Length 60,145,895。其他电脑可通过“检查更新”或重新安装升级。
+- 2026-09-16：**P60 UI 优化阶段全部完成（P60-01 ~ P60-06）**。成果：① 建立完整设计令牌层（间距/圆角/字号/控件尺寸/动效 + 语义画刷，深色字典同步覆写）；② `Theme.xaml` 可令牌化字面量全部归位；③ **会议室看板主题化——深色主题下不再白底**，桌面组件自动跟随其主题/颜色设置；④ 看板文字对比度全部达 WCAG AA（修掉浅色 4.41:1 的不达标项），本人占用加 3px 标记条使本人/他人不只靠颜色区分；⑤ 12 处内联页面标题归位 `PageTitleStyle`，助理导航去掉星光图标，遮罩令牌化；⑥ 看板浅/深双主题截图人工核验通过，`UI_DESIGN.md`/`USER_GUIDE.md` 已同步。新增 4 个测试文件/类共 23 项测试。过程中修正 4 处自身缺陷（圆角令牌类型、令牌键后缀、调色板默认值、截图偏移），并识别出 1 个**假通过**的视觉测试。当前完整回归 **502/502**（Core 93、Infrastructure 104、Desktop 261、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。遗留：约 20 处 `FontSize="11"` 未归入字号阶梯（属观感变更，需单独一轮 + 三档分辨率逐页截图）。
 - 2026-09-16：**P60-05 页面字面量清理完成**。实测共 12 处页面标题内联 `FontSize="20"+SemiBold`（比方案初版预估的 3 处多，含 `MainWindow` 工作区占位标题、`CalendarView` 日期标题、`SettingsView` 五个页签标题），全部改用 `PageTitleStyle`；助理导航 `Sparkles → Bot`（UI_DESIGN §1.6 禁止星光图标）；`RegionSelectorWindow` 遮罩改用 `OverlayScrimBrush`；两个会议窗口标题改用 `SectionTitleStyle`。刻意放行 2 处并注明理由：`TodayView` 天气大标题（非页面标题）、区域选择器的白色选框。新增 3 项源码契约测试。完整回归 **501/501**（Core 93、Infrastructure 104、Desktop 260、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。下一片 P60-06（三档分辨率 × 浅深主题视觉验收 + 文档同步）。遗留：页面内约 20 处 `FontSize="11"` 未批量替换（11→12px 属观感变更，留待 P60-06 评估）。
 - 2026-09-16：**P60-04 看板可读性与状态表达完成**。新增 `ColorContrast`（WCAG 2.1）并逐对实测，发现浅色「他人占用」文字对比度仅 **4.41:1**（低于 AA 的 4.5:1），改为 `#5C6470` 后达 4.82:1；本人占用块新增左侧 3px 标记条（与导航选中项同一语法），使「本人/他人」不只靠颜色区分；标签字号由硬编码 11px 改为 12px 并对齐 `FontCaptionSize` 档位。新增 4 项测试（对比度 8 对、标记条独立性、字号档位、标记条宽度）。完整回归 **498/498**（Core 93、Infrastructure 104、Desktop 257、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。下一片 P60-05（页面字面量清理）。
 - 2026-09-16：**P60-03 会议室看板主题化完成（本阶段最高价值项）**。看板原有 18 处硬编码十六进制颜色改为 14 个 `RoomBoard*` 语义令牌 + 解析失败回落，`DarkTheme.xaml` 逐一覆写全部 14 个令牌——**深色主题下看板不再白底**，且桌面组件因 `DesktopAppearanceController` 重绑窗口级语义键而自动跟随组件的主题/颜色设置。新增 `RoomBoardPaletteTests`（4 项）与运行时 `BoardSurfaceFollowsTheActiveTheme`。过程中两次修正自己的错误：令牌键后缀 `Brush` 缺失、浅色默认值把 `PreviewFill` 误写成深色强调色（均由「默认值与 Theme.xaml 逐值一致」断言捕获）；并发现首版视觉测试因渲染缓存而**假通过**（修复前也能过），已改为渲染 board 自身 + 显式跑渲染队列的真断言。当前完整回归 **494/494**（Core 93、Infrastructure 104、Desktop 253、Server 44），build 0 警告 0 错误，`eng\verify.cmd` 退出 0。下一片 P60-04（看板可读性与状态表达：对比度下限、字号、本人/他人不只靠颜色区分）。
@@ -55,7 +56,7 @@
 - 最近验证：2026-08-23，`eng\verify.cmd` 通过，完整回归 414/414（Core 88、Infrastructure 93、Desktop 191、Server 42），build 0 警告/0 错误；本轮未重新生成或上传安装包。
 - 2026-08-23：更新图标改用蓝色 `PrimaryButtonStyle`，保持新版本可用时清晰可见；快速新增窗口改为非模态 `Show()`，创建/取消使用显式 `Close()`，关闭后异步保存请求并防止重复打开。
 - 最近验证：2026-08-23，`eng\verify.cmd` 通过，完整回归 414/414（Core 88、Infrastructure 93、Desktop 191、Server 42），build 0 警告/0 错误；本轮未重新生成安装包。
-- 唯一下一步（2026-09-16 起）：**先裁决 Q1/Q2/Q3，再开工 P60-01 令牌基线**（新增设计令牌，不改页面引用，验收以「完整回归 479/479 + 新增契约测试通过 + 观感零变动」为准）；P15-09d 两地云端验收与生产 HTTPS/OIDC 为长期并行事项，见 P40/P47。本轮无阻塞项。
+- 唯一下一步（2026-09-16 起）：**P60 UI 优化阶段已全部完成，等待用户查看效果并提意见**。截图证据在 `artifacts\ui-p60\`（`room-board-light.png`/`room-board-dark.png`）。后续可选：① 把约 20 处 `FontSize="11"` 归入字号阶梯（需三档分辨率逐页截图验收）；② 处理方案文档 §9 记录的 8 处文档陈旧/矛盾问题（`DESIGN.md` 头部、`AUTO_UPDATE_DESIGN.md` 版本号、`USER_GUIDE - 副本.md` 等）。长期并行事项：P15-09d 两地云端验收、生产 HTTPS/OIDC（P47）。本轮无阻塞项。
 
 - 当前阶段：P16 快速新增/看板/桌面组件增强（P16-04~07 完成）
 - 当前状态：P16 已发布，后续云端验收与生产 HTTPS/OIDC 仍是长期事项；本轮 P18 变更已在上方检查点记录。
@@ -1154,8 +1155,16 @@ Verify：完整验证命令、结果、必要的人工检查
   - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **501/501**（Core 93、Infrastructure 104、Desktop 260、Server 44）；`UiDesignContractTests` 37/37。
   - 遗留说明：`Views\CalendarView.xaml`、`Views\RoomBookingPicker.xaml` 等处仍有若干 `FontSize="11"`（不在字号阶梯上，最接近 `FontCaptionSize=12`）。未在本切片批量替换，因为 11→12px 会改变多处布局度量，属于「观感变更」而非「等价替换」，留待 P60-06 视觉验收时统一评估与截图确认。
 
-- [ ] P60-06 视觉验收与文档同步：按 `UI_DESIGN.md` §9 核验 **1920×1080、1366×768**，本轮补充 **980×640**（`MainWindow` 的 `MinWidth/MinHeight`）；桌面组件另验浅色/深色/复杂壁纸背景；检查无文字截断、控件位移、重叠、卡片套卡片、装饰渐变；键盘焦点/悬停/禁用/错误/选中状态完整。
-  - Verify：`eng\verify.cmd` 退出 0；截图集归档到 `artifacts\`；`docs\UI_DESIGN.md` §2 令牌表与实现一致；`docs\USER_GUIDE.md` 中受影响的界面描述已更新；本文件状态、验证证据与唯一下一步已同步。
+- [x] P60-06 视觉验收与文档同步：看板浅/深双主题截图人工核验；`UI_DESIGN.md` 补令牌表与两条实现陷阱；`USER_GUIDE.md` 同步用户可见变化。
+  - 视觉验收：新增测试 `RendersBoardScreenshotsForManualReview`，把看板在浅色与深色下各渲染一张 PNG 到 `artifacts/ui-p60/`（`room-board-light.png` 1250×576、`room-board-dark.png` 1250×576），**已人工查看确认**：浅色底 `#FFFFFF`、深色底 `#22252A`，网格线两种主题下均清晰，10 个会议室列 × 32 个半小时格布局正确，无截断或重叠。这为「深色看板不再白底」提供了可复核的图像证据。
+    - 排障记录：首版截图左侧有 44px 黑色空带，且**浅深两张都有**——据此判定为截图产物而非渲染缺陷。根因是 `RenderTargetBitmap.Render(board)` 按控件在视觉树中的偏移作画（看板位于 44px 小时刻度列之后）。改为用 `VisualBrush` 包一层再从 (0,0) 重绘后，边缘像素为 `#FFFFFF`/`#22252A`，空带消失。
+  - 文档同步：
+    - `docs/UI_DESIGN.md` 新增 §2.4 完整令牌表（间距/圆角/字号/控件尺寸/动效/语义画刷 + 14 个看板专用色，含浅深两列）与对比度下限。
+    - 新增 §11「令牌类型陷阱」：记录圆角必须是 `CornerRadius` 而非 `sys:Double`（P60-02 踩过的坑）、多值属性需要 `Thickness`、以及「令牌必须断言具体 CLR 类型并最好赋给真实控件强制布局」。
+    - 新增 §12「视觉回归测试的可靠性要求」：记录 `Render` 的偏移行为、重绘缓存导致的假通过、以及「必须先确认去掉修复后测试会失败」。
+    - `docs/USER_GUIDE.md`：版本号由 0.6.5 更正为 0.6.6（与 `version.json` 一致）；会议室看板小节补充「本人预约左侧深色竖条标记」与「看板配色跟随主题，深色主题下不再出现白板」两条用户可见变化。
+  - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **502/502**（Core 93、Infrastructure 104、Desktop 261、Server 44）。
+  - 遗留（未做，明确记录）：页面内约 20 处 `FontSize="11"` 未归入字号阶梯（最接近 `FontCaptionSize=12`）。11→12px 会改变多处文本度量，属观感变更而非等价替换，需要单独一轮并在三档分辨率下逐页截图确认；本轮为守住「零意外观感变更」边界而未动。
 
 - 未决问题（开工前需用户裁决，详见方案文档 §4.3 与 §8）：
   - Q1 普通按钮圆角保持 8px（纯令牌化，零回归）还是改为 `RadiusSm=4` 以严格符合 `UI_DESIGN.md` §2.2（会变动全部按钮观感）？

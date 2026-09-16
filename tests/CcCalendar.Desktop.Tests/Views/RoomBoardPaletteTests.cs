@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using CcCalendar.Desktop.ViewModels;
 using CcCalendar.Desktop.Views;
 
@@ -243,6 +245,101 @@ public sealed class RoomBoardPaletteTests
     public void AccentBarWidthMatchesTheNavigationMarker()
     {
         Assert.Equal(3d, RoomBookingBoardControl.AccentBarWidth);
+    }
+
+    /// <summary>
+    /// P60-06 视觉验收辅助：把看板在浅色与深色下各渲染一张 PNG，输出到
+    /// <c>artifacts/ui-p60/</c> 供人工核验。
+    ///
+    /// 这不是断言型测试（渲染结果由人看），因此除「文件确实写出且非空」之外不做判断；
+    /// 它的价值是让「深色看板不再是白底」这件事有可复核的图像证据，而不只是日志里的一句话。
+    /// </summary>
+    [Fact]
+    public void RendersBoardScreenshotsForManualReview()
+    {
+        string outputDirectory = Path.Combine(FindRepositoryRoot(), "artifacts", "ui-p60");
+        Directory.CreateDirectory(outputDirectory);
+
+        foreach ((string themeName, string? themeSource) in new (string, string?)[]
+        {
+            ("light", null),
+            ("dark", "pack://application:,,,/cccalendar;component/Themes/DarkTheme.xaml"),
+        })
+        {
+            RunOnThemeThread((_, __) =>
+            {
+                var window = new Window { Width = 760, Height = 640, ShowInTaskbar = false };
+                if (themeSource is not null)
+                {
+                    window.Resources.MergedDictionaries.Add(
+                        new ResourceDictionary { Source = new Uri(themeSource) });
+                }
+
+                var picker = new RoomBookingPicker();
+                picker.Initialize(
+                    DateOnly.Parse("2026-08-20", CultureInfo.InvariantCulture),
+                    _ => Array.Empty<CcCalendar.Core.Schedules.CalendarEvent>(),
+                    TimeZoneInfo.Local);
+                window.Content = picker;
+                try
+                {
+                    window.Show();
+                    window.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background, () => { });
+                    window.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render, () => { });
+
+                    RoomBookingBoardControl board = picker.Board;
+                    board.RefreshPalette();
+                    board.UpdateLayout();
+
+                    int width = (int)Math.Ceiling(board.ActualWidth);
+                    int height = (int)Math.Ceiling(board.ActualHeight);
+
+                    // RenderTargetBitmap.Render(board) 会按控件在视觉树中的偏移作画
+                    // （看板位于 44px 小时刻度列之后），因此截图左侧会留一条空带。
+                    // 用 VisualBrush 包裹后从 (0,0) 重绘，把偏移抵消掉。
+                    var wrapper = new DrawingVisual();
+                    using (DrawingContext context = wrapper.RenderOpen())
+                    {
+                        context.DrawRectangle(
+                            new VisualBrush(board) { Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top },
+                            null,
+                            new Rect(0, 0, width, height));
+                    }
+
+                    var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+                    bitmap.Render(wrapper);
+
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                    string path = Path.Combine(outputDirectory, $"room-board-{themeName}.png");
+                    using FileStream stream = File.Create(path);
+                    encoder.Save(stream);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            });
+        }
+
+        foreach (string themeName in new[] { "light", "dark" })
+        {
+            string path = Path.Combine(outputDirectory, $"room-board-{themeName}.png");
+            Assert.True(File.Exists(path), $"未生成看板截图：{path}");
+            Assert.True(new FileInfo(path).Length > 0, $"看板截图为空文件：{path}");
+        }
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "CcCalendar.sln")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return directory.FullName;
     }
 
     private static Color ReadPaletteComponent(RoomBoardPalette palette, string component) => component switch
