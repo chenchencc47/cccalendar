@@ -9,6 +9,7 @@ public sealed class TrayIconService : IDisposable
     private readonly ContextMenuStrip menu;
     private readonly NotifyIcon notifyIcon;
     private readonly Icon applicationIcon;
+    private bool isDisposed;
 
     public TrayIconService(
         Action showMainWindow,
@@ -76,10 +77,23 @@ public sealed class TrayIconService : IDisposable
 
     public void ShowNotification(string title, string message)
     {
+        if (isDisposed)
+        {
+            return;
+        }
+
         notifyIcon.BalloonTipIcon = ToolTipIcon.Info;
         notifyIcon.BalloonTipTitle = title;
         notifyIcon.BalloonTipText = message;
         notifyIcon.ShowBalloonTip(5000);
+    }
+
+    public void Hide()
+    {
+        if (!isDisposed)
+        {
+            notifyIcon.Visible = false;
+        }
     }
 
     private static ToolStripMenuItem CreateBehaviorMenu(DesktopBehaviorMenuTarget target)
@@ -122,6 +136,12 @@ public sealed class TrayIconService : IDisposable
 
     public void Dispose()
     {
+        if (isDisposed)
+        {
+            return;
+        }
+
+        isDisposed = true;
         notifyIcon.Visible = false;
         notifyIcon.Dispose();
         applicationIcon.Dispose();

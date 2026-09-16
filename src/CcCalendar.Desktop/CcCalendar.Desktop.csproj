@@ -27,7 +27,7 @@
     <AssemblyName>cccalendar</AssemblyName>
     <ApplicationIcon>Assets\cccalendar.ico</ApplicationIcon>
     <Product>cccalendar</Product>
-    <Version>0.5.9</Version>
+    <Version>0.6.6</Version>
     <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <Nullable>enable</Nullable>

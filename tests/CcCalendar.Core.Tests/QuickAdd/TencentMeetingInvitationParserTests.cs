@@ -113,6 +113,26 @@ public sealed class TencentMeetingInvitationParserTests
     }
 
     [Fact]
+    public void MatchRoomAllowsSingleMissingCharacterInLocation()
+    {
+        string matched = TencentMeetingInvitationParser.MatchRoom(
+            "财务三楼会议室",
+            ["", "财务部三楼会议室", "采购三楼会议室"]);
+
+        Assert.Equal("财务部三楼会议室", matched);
+    }
+
+    [Fact]
+    public void MatchRoomAllowsSingleMissingCharacterWithSurroundingText()
+    {
+        string matched = TencentMeetingInvitationParser.MatchRoom(
+            "佛山西樵财务三楼会议室",
+            ["", "财务部三楼会议室", "采购三楼会议室"]);
+
+        Assert.Equal("财务部三楼会议室", matched);
+    }
+
+    [Fact]
     public void MatchRoomReturnsFirstWhenNothingMatches()
     {
         string matched = TencentMeetingInvitationParser.MatchRoom(

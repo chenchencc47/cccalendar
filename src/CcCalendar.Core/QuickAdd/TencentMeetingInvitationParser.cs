@@ -83,7 +83,9 @@ public static partial class TencentMeetingInvitationParser
 
     /// <summary>
     /// 把邀请中的与会地点模糊匹配到已知会议室：候选房间名出现在地点文本中
-    /// （或地点文本包含在房间名中）即命中，多个命中取最长的房间名。
+    /// （或地点文本包含在房间名中）即命中；没有直接命中时，允许两者仅相差一个字符，
+    /// 或房间名少一个字符的变体出现在带前后缀的地点文本中（如“佛山西樵财务三楼会议室”
+    /// 匹配“财务部三楼会议室”），多个命中取最长的房间名。
     /// 无命中时返回第一个候选（约定为空串=不选会议室）。
     /// </summary>
     public static string MatchRoom(string? location, IReadOnlyList<string> rooms)
@@ -100,7 +102,68 @@ public static partial class TencentMeetingInvitationParser
                     || room.Contains(normalized, StringComparison.OrdinalIgnoreCase)))
             .OrderByDescending(room => room.Length)
             .FirstOrDefault();
+
+        if (best is null && normalized.Length > 0)
+        {
+            best = rooms
+                .Where(room => !string.IsNullOrWhiteSpace(room)
+                    && IsSingleCharacterInsertionMatch(normalized, room))
+                .OrderByDescending(room => room.Length)
+                .FirstOrDefault();
+        }
+
+        if (best is null && normalized.Length > 0)
+        {
+            best = rooms
+                .Where(room => !string.IsNullOrWhiteSpace(room)
+                    && IsSingleCharacterVariantContained(normalized, room))
+                .OrderByDescending(room => room.Length)
+                .FirstOrDefault();
+        }
+
         return best ?? rooms[0];
+    }
+
+    private static bool IsSingleCharacterInsertionMatch(string first, string second)
+    {
+        if (Math.Abs(first.Length - second.Length) != 1)
+        {
+            return false;
+        }
+
+        string shorter = first.Length < second.Length ? first : second;
+        string longer = first.Length < second.Length ? second : first;
+        for (int index = 0; index < longer.Length; index++)
+        {
+            if (string.Equals(longer.Remove(index, 1), shorter, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 房间名少一个字符的变体出现在地点文本中即命中：
+    /// 支持地点带城市/楼栋等前后缀且缺少房间名中的一个字符的场景。
+    /// </summary>
+    private static bool IsSingleCharacterVariantContained(string location, string room)
+    {
+        if (room.Length < 2)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < room.Length; index++)
+        {
+            if (location.Contains(room.Remove(index, 1), StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

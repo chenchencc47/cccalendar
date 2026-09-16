@@ -150,3 +150,28 @@
 - [x] 删除成功后按房间、标题、日期和分钟级起止时间删除对应本地日程，再刷新看板。
 - [x] 新增匹配回归测试；桌面测试 233/233 通过。
 - [x] 发布 0.5.9 Windows 安装包并上传 OSS；完整回归 468/468；安装包 `artifacts\\installer\\cccalendar-0.5.9-win-x64-setup.exe`，60,130,937 bytes，SHA-256 `81409611D0367591D30AB05F5346095EAAA456B166D2B9FEBD6349E2DAD992F6`；公网清单和安装包 HTTP 200、长度/哈希一致。
+
+## P35 更新安装流程与托盘退出修复
+
+- [x] 修复托盘菜单退出可能卡住的问题；更新前展示目标版本更新说明，下载后校验 SHA-256 并自动关闭、安装和重启。
+- [x] 发布 0.6.1 Windows 安装包并上传 OSS；完整回归 471/471；安装包 `artifacts\\installer\\cccalendar-0.6.1-win-x64-setup.exe`，60,149,591 bytes，SHA-256 `7D6D2384272E7FAF7AD1A511238F50CD80EF46105D8DE1A63722B6BD826E7700`；公网清单和安装包 HTTP 200、长度/哈希一致。
+
+## P36 托盘退出残留修复
+
+- [x] 退出时立即隐藏托盘图标，忽略退出期间的迟到托盘回调，并让托盘资源销毁可重复调用，避免已关闭窗口再次 `Show()`。
+- [x] 发布 0.6.2 Windows 安装包并上传 OSS；完整回归 473/473；安装包 `artifacts\\installer\\cccalendar-0.6.2-win-x64-setup.exe`，60,147,755 bytes，SHA-256 `299C0A07FA9E39CFB718FEF8587377E15A2AD8A207922B6A112499CD2F19D277`；公网清单和安装包 HTTP 200、长度/哈希一致。
+
+## P37 退出进程超时保护
+
+- [x] 提醒调度器退出最多等待 2 秒，后台数据库任务未及时响应时继续关闭应用，避免安装器仍检测到旧进程。
+- [x] 发布 0.6.3 Windows 安装包并上传 OSS；完整回归 473/473；安装包 `artifacts\\installer\\cccalendar-0.6.3-win-x64-setup.exe`，60,155,347 bytes，SHA-256 `8BC8F2C98021B2250931828B9AA84CB7E4E6341D4C8FE01DBA7C228CD1F8A186`；公网清单和安装包 HTTP 200、长度/哈希一致。
+
+## P38 单实例保护
+
+- [x] 增加 `Local\\cccalendar-single-instance` 互斥锁，重复启动直接退出，避免多个同路径进程同时运行。
+- [x] 发布 0.6.4 Windows 安装包并上传 OSS；完整回归 473/473；安装包 `artifacts\\installer\\cccalendar-0.6.4-win-x64-setup.exe`，60,143,219 bytes，SHA-256 `CFC1EE5358FFA5831ED021AF828772CFF2BE74E95A8668BF6EF0290247A13F24`；公网清单和安装包 HTTP 200、长度/哈希一致。
+
+## P39 退出进程与安装更新验证
+
+- [x] 延续单实例保护、退出超时保护、托盘隐藏及迟到回调隔离修复，供 0.6.5 安装验收。
+- [x] 发布 0.6.5 Windows 安装包并上传 OSS；完整回归 473/473；安装包 `artifacts\\installer\\cccalendar-0.6.5-win-x64-setup.exe`，60,156,370 bytes，SHA-256 `D7FAC10D8441C6CF7FC2B2E7259EDDB38339118868B50BF743383D75E66533A8`；公网清单和安装包 HTTP 200、长度/哈希一致，清单标记为非强制更新。

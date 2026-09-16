@@ -33,6 +33,7 @@ WPF 客户端
   "url": "https://download.example.com/cccalendar-0.3.6-win-x64-setup.exe",
   "sha256": "...",
   "mandatory": false,
+  "releaseNotes": "0.3.6 更新内容：\\n\\n- 修复提醒重复发送。\\n- 优化启动速度。",
   "releaseNotesUrl": "https://download.example.com/releases/0.3.6.html"
 }
 ```
@@ -50,7 +51,7 @@ WPF 客户端
 ### 第三阶段：失败恢复与灰度
 
 - 更新前写入 pending 状态，启动成功后清除；连续启动失败时保留旧版本安装包并提示回滚。
-- 先通过 `mandatory=false` 小范围验证，稳定后再考虑强制更新。
+- 当前产品不启用强制更新；`mandatory` 保持 `false`，客户端始终要求用户主动确认。
 - 生产发布前检查版本号、安装包哈希、签名、HTTPS 证书和 OSS 对象权限。
 
 ## 技术选型
@@ -61,7 +62,7 @@ WPF 客户端
 
 - `ApplicationUpdateClient` 只接受 HTTPS manifest 地址，解析版本、下载地址和 SHA-256，并只返回高于当前版本的清单。
 - WPF 启动完成后异步检查，不阻塞本地数据库、天气和会议室功能。
-- 发现新版本时显示提示，用户确认后打开 HTTPS 下载地址；当前不会静默执行未知安装包。
+- 发现新版本时先显示目标版本号和 `releaseNotes`；后台检查只显示更新入口，不下载、不安装。只有用户点击更新并确认后，才下载并校验 HTTPS 安装包。
 - 生产构建使用 `App.xaml.cs` 的 `DefaultUpdateManifestUrl`，当前已固化为 `https://cccalendar-releases-01.oss-cn-heyuan.aliyuncs.com/releases/version.json`，普通用户无需设置任何环境变量；`CCCALENDAR_UPDATE_MANIFEST_URL` 仅作为测试、灰度和回滚覆盖项。
 
 ## 一键安装更新的后续设计

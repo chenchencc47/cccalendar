@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Windows;
@@ -31,7 +32,10 @@ public partial class App : Application, IDisposable
     // The environment variable remains an override for staging and rollback tests.
     private const string DefaultUpdateManifestUrl =
         "https://cccalendar-releases-01.oss-cn-heyuan.aliyuncs.com/releases/version.json";
+    private const string SingleInstanceMutexName = "Local\\cccalendar-single-instance";
 
+    private Mutex? singleInstanceMutex;
+    private bool ownsSingleInstanceMutex;
     private MainWindow? mainWindow;
     private QuickPanelWindow? quickPanel;
     private DesktopWorkbenchWindow? desktopWorkbench;
@@ -60,6 +64,16 @@ public partial class App : Application, IDisposable
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        singleInstanceMutex = new Mutex(
+            true,
+            SingleInstanceMutexName,
+            out ownsSingleInstanceMutex);
+        if (!ownsSingleInstanceMutex)
+        {
+            Shutdown();
+            return;
+        }
+
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
@@ -315,6 +329,13 @@ public partial class App : Application, IDisposable
     {
         SaveAppSettings();
         Dispose();
+        if (ownsSingleInstanceMutex)
+        {
+            singleInstanceMutex?.ReleaseMutex();
+            ownsSingleInstanceMutex = false;
+        }
+        singleInstanceMutex?.Dispose();
+        singleInstanceMutex = null;
         base.OnExit(e);
     }
 
@@ -429,7 +450,23 @@ public partial class App : Application, IDisposable
         popupReminderChannel = null;
         if (reminderScheduler is not null)
         {
-            reminderScheduler.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            try
+            {
+                reminderScheduler.DisposeAsync()
+                    .AsTask()
+                    .WaitAsync(TimeSpan.FromSeconds(2))
+                    .GetAwaiter()
+                    .GetResult();
+            }
+            catch (TimeoutException)
+            {
+                LogCrash(new TimeoutException("提醒调度器在退出时未能及时停止，应用将继续关闭。"));
+            }
+            catch (Exception exception)
+            {
+                LogCrash(exception);
+            }
+
             reminderScheduler = null;
         }
 
@@ -466,6 +503,11 @@ public partial class App : Application, IDisposable
 
     private void ShowMainWindow()
     {
+        if (isExiting)
+        {
+            return;
+        }
+
         mainWindow?.Show();
         mainWindow?.Activate();
     }
@@ -501,6 +543,8 @@ public partial class App : Application, IDisposable
                 return new UpdateCheckResult(UpdateCheckStatus.Latest, currentVersion);
             }
 
+            // Checking for updates only surfaces the opt-in action; it never downloads
+            // or installs anything until the user clicks the update button.
             mainWindow?.SetAvailableUpdate(update);
             return new UpdateCheckResult(UpdateCheckStatus.Available, currentVersion, update);
         }
@@ -508,6 +552,58 @@ public partial class App : Application, IDisposable
         {
             // Update checks are best-effort and must never prevent local calendar use.
             return new UpdateCheckResult(UpdateCheckStatus.Failed, currentVersion, Error: exception.Message);
+        }
+    }
+
+    internal async Task InstallUpdateAsync(
+        ApplicationUpdateManifest update,
+        Window owner)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        ArgumentNullException.ThrowIfNull(owner);
+
+        if (isExiting)
+        {
+            return;
+        }
+
+        try
+        {
+            string releaseNotes = string.IsNullOrWhiteSpace(update.ReleaseNotes)
+                ? "此版本暂无详细更新说明。"
+                : update.ReleaseNotes.Trim();
+            MessageBoxResult confirmation = MessageBox.Show(
+                owner,
+                $"新版本 {update.Version} 更新内容：\n\n{releaseNotes}\n\n点击“是”后，应用会下载并校验安装包，然后自动退出并启动安装程序。安装完成后会自动重新打开。是否继续？",
+                "cccalendar 更新",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+            if (confirmation != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            updateHttpClient ??= new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            string updateDirectory = Path.Combine(Path.GetTempPath(), "cccalendar-update");
+            string installerPath = await new ApplicationUpdateClient(updateHttpClient)
+                .DownloadInstallerAsync(update, updateDirectory, CancellationToken.None);
+
+            Process.Start(new ProcessStartInfo(installerPath)
+            {
+                Arguments = "/CLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
+                UseShellExecute = true,
+                WorkingDirectory = Path.GetDirectoryName(installerPath),
+            });
+            ExitApplication();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(
+                owner,
+                $"下载或启动安装程序失败：{exception.Message}",
+                "cccalendar 更新",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
     }
 
@@ -527,11 +623,21 @@ public partial class App : Application, IDisposable
 
     private void ToggleQuickPanel()
     {
+        if (isExiting)
+        {
+            return;
+        }
+
         quickPanel?.Toggle();
     }
 
     private void OpenQuickAdd()
     {
+        if (isExiting)
+        {
+            return;
+        }
+
         mainWindow?.Show();
         mainWindow?.Activate();
         _ = mainWindow?.OpenQuickAddAsync() ?? Task.CompletedTask;
@@ -540,6 +646,7 @@ public partial class App : Application, IDisposable
     private void ExitApplication()
     {
         isExiting = true;
+        trayIcon?.Hide();
         quickPanel?.Close();
         desktopWorkbench?.Close();
         desktopAgenda?.Close();
@@ -550,11 +657,21 @@ public partial class App : Application, IDisposable
 
     private void ToggleDesktopWorkbench()
     {
+        if (isExiting)
+        {
+            return;
+        }
+
         ToggleDesktopComponent(DesktopComponentKind.Calendar);
     }
 
     private void DisableAllMousePassthrough()
     {
+        if (isExiting)
+        {
+            return;
+        }
+
         desktopWorkbench?.DisableMousePassthrough();
         desktopAgenda?.DisableMousePassthrough();
         desktopTodo?.DisableMousePassthrough();
@@ -902,6 +1019,11 @@ public partial class App : Application, IDisposable
 
     private void ToggleDesktopComponent(DesktopComponentKind kind)
     {
+        if (isExiting)
+        {
+            return;
+        }
+
         switch (kind)
         {
             case DesktopComponentKind.Calendar:

@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Windows;
@@ -32,6 +31,7 @@ public partial class MainWindow : Window, IDisposable, INotifyPropertyChanged
     private readonly Func<RoomOccupiedBlock, Task>? deleteRemoteBooking;
     private ApplicationUpdateManifest? pendingUpdate;
     private QuickAddWindow? quickAddWindow;
+    private bool updateInstallInProgress;
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler<ToolNotificationEventArgs>? ToolNotificationRequested;
@@ -178,18 +178,24 @@ public partial class MainWindow : Window, IDisposable, INotifyPropertyChanged
         ToolNotificationRequested?.Invoke(this, e);
     }
 
-    private void UpdateClick(object sender, RoutedEventArgs e)
+    private async void UpdateClick(object sender, RoutedEventArgs e)
     {
-        if (pendingUpdate is not { } update
-            || !Uri.TryCreate(update.Url, UriKind.Absolute, out Uri? downloadUri))
+        if (updateInstallInProgress
+            || pendingUpdate is not { } update
+            || Application.Current is not App app)
         {
             return;
         }
 
-        Process.Start(new ProcessStartInfo(downloadUri.AbsoluteUri)
+        updateInstallInProgress = true;
+        try
         {
-            UseShellExecute = true,
-        });
+            await app.InstallUpdateAsync(update, this);
+        }
+        finally
+        {
+            updateInstallInProgress = false;
+        }
     }
 
     internal void SetAvailableUpdate(ApplicationUpdateManifest update)

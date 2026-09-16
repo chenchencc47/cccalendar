@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using CcCalendar.Core.QuickAdd;
+using CcCalendar.Core.Todos;
 using CcCalendar.Desktop;
 using CcCalendar.Desktop.ViewModels;
 
@@ -33,6 +34,7 @@ public sealed class QuickAddWindowRuntimeTests
                 // 类型默认日程且日程字段可见。
                 Assert.Equal(QuickAddKind.Event, window.SelectedOption.Kind);
                 Assert.Equal(Visibility.Visible, window.EventFields.Visibility);
+                Assert.Equal(Visibility.Collapsed, window.TodoFields.Visibility);
 
                 // 日期已绑定且模板文本框显示日期文本。
                 Assert.Equal(DateTime.Parse("2026-08-19", Invariant), window.EventDatePicker.SelectedDate);
@@ -297,6 +299,44 @@ public sealed class QuickAddWindowRuntimeTests
 
                 Assert.False(applied);
                 Assert.Equal(string.Empty, window.TitleBox.Text);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void TodoModeShowsQuadrantPickerAndCarriesSelectionIntoRequest()
+    {
+        RunOnSta(() =>
+        {
+            var window = new QuickAddWindow(
+                new FrozenTimeProvider(new DateTimeOffset(2026, 8, 24, 10, 0, 0, TimeSpan.FromHours(8))),
+                initialKind: QuickAddKind.Todo);
+            try
+            {
+                window.Show();
+                DoEvents(window);
+
+                // 待办类型下四象限可见，日程字段隐藏。
+                Assert.Equal(QuickAddKind.Todo, window.SelectedOption.Kind);
+                Assert.Equal(Visibility.Visible, window.TodoFields.Visibility);
+                Assert.Equal(Visibility.Collapsed, window.EventFields.Visibility);
+                Assert.Equal(5, window.QuadrantBox.Items.Count);
+
+                // 默认“不指定”：请求不携带象限。
+                window.TitleBox.Text = "整理需求清单";
+                Assert.Equal(0, window.QuadrantBox.SelectedIndex);
+                Assert.True(window.TryBuildRequests(out _));
+                Assert.Null(Assert.Single(window.Requests).Quadrant);
+
+                // 选择“重要不紧急”后携带到请求。
+                window.QuadrantBox.SelectedIndex = 2;
+                DoEvents(window);
+                Assert.True(window.TryBuildRequests(out _));
+                Assert.Equal(TodoQuadrant.ImportantNotUrgent, Assert.Single(window.Requests).Quadrant);
             }
             finally
             {

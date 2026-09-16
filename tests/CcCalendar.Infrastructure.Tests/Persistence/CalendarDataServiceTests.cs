@@ -344,6 +344,35 @@ public sealed class CalendarDataServiceTests
     }
 
     [Fact]
+    public async Task QuickAddTodoWithQuadrantPersistsQuadrantFlags()
+    {
+        await using var database = new TemporaryCalendarDatabase();
+        var service = new CalendarDataService(database.DatabasePath);
+        await service.InitializeAsync(CancellationToken.None);
+
+        await service.QuickAddAsync(
+            new QuickAddRequest(
+                QuickAddKind.Todo,
+                "整理需求清单",
+                null,
+                null,
+                null,
+                Quadrant: TodoQuadrant.ImportantNotUrgent),
+            CancellationToken.None);
+        await service.QuickAddAsync(
+            new QuickAddRequest(QuickAddKind.Todo, "未分类事项", null, null, null),
+            CancellationToken.None);
+
+        TodoItem[] todos = [.. (await service.LoadAsync(CancellationToken.None)).Todos];
+        TodoItem quadrantTodo = Assert.Single(todos, item => item.Title == "整理需求清单");
+        Assert.True(quadrantTodo.IsImportant);
+        Assert.False(quadrantTodo.IsUrgentOverride);
+        TodoItem plainTodo = Assert.Single(todos, item => item.Title == "未分类事项");
+        Assert.False(plainTodo.IsImportant);
+        Assert.Null(plainTodo.IsUrgentOverride);
+    }
+
+    [Fact]
     public async Task MoveTodoToStatusPersistsStatus()
     {
         await using var database = new TemporaryCalendarDatabase();

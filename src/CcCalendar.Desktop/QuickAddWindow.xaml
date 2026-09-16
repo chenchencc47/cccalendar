@@ -231,6 +231,20 @@
                             </StackPanel>
                         </Grid>
                     </StackPanel>
+                    <StackPanel x:Name="TodoFields" Margin="0,12,0,0" Visibility="Collapsed">
+                        <TextBlock Margin="0,0,0,4" Foreground="{DynamicResource TextSecondaryBrush}" Text="四象限" />
+                        <ComboBox x:Name="QuadrantBox"
+                                  Height="36"
+                                  AutomationProperties.Name="待办四象限"
+                                  SelectedIndex="0"
+                                  ToolTip="可选；按重要/紧急组合预先归类待办">
+                            <ComboBoxItem Content="不指定" />
+                            <ComboBoxItem Content="重要且紧急" />
+                            <ComboBoxItem Content="重要不紧急" />
+                            <ComboBoxItem Content="紧急不重要" />
+                            <ComboBoxItem Content="不重要不紧急" />
+                        </ComboBox>
+                    </StackPanel>
                     <TextBlock x:Name="ValidationText"
                                Margin="0,10,0,0"
                                Foreground="{DynamicResource DangerBrush}" />

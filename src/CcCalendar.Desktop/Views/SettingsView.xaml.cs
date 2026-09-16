@@ -8,9 +8,26 @@ namespace CcCalendar.Desktop.Views;
 
 public partial class SettingsView : UserControl
 {
+    private const string CurrentReleaseNotes = "0.6.5 更新内容：\n\n"
+        + "• 修复退出应用后托盘残留图标仍可触发窗口异常的问题。\n"
+        + "• 退出开始时立即隐藏托盘图标，并忽略退出期间到达的托盘操作。\n"
+        + "• 提醒调度器退出最多等待 2 秒，避免后台任务拖住应用进程。\n"
+        + "• 增加单实例保护，重复启动不会再产生多个后台进程。\n"
+        + "• 托盘通知和资源销毁改为可重复调用，减少升级时残留进程。";
+
     public SettingsView()
     {
         InitializeComponent();
+    }
+
+    private void ReleaseNotesClick(object sender, System.Windows.RoutedEventArgs e)
+    {
+        MessageBox.Show(
+            Window.GetWindow(this),
+            CurrentReleaseNotes,
+            "cccalendar 更新内容",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private void ShortcutPreviewKeyDown(object sender, KeyEventArgs e)

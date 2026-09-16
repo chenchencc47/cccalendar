@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -395,6 +396,40 @@ public sealed class ProviderAiAssistantClientTests
         Assert.Equal("365-5683-5623", draft.MeetingNumber);
         Assert.Contains("\"location\"", handler.Requests[0].Body, StringComparison.Ordinal);
         Assert.Contains("\"meetingNumber\"", handler.Requests[0].Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TimedEventProposalReanchorsUtcSuffixedTimesToStatedTimeZone()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            """
+            {"choices":[{"message":{"role":"assistant","content":"","tool_calls":[{"id":"call_1","type":"function","function":{"name":"propose_timed_event","arguments":"{\"title\":\"每日例会\",\"startAt\":\"2026-08-24T10:10:00Z\",\"endAt\":\"2026-08-24T11:10:00Z\",\"timeZoneId\":\"Asia/Shanghai\"}"}}]}}]}
+            """,
+            """
+            {"choices":[{"message":{"role":"assistant","content":"请确认。"}}]}
+            """);
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+
+        AiAssistantResult result = await CreateClient(database, handler, settings).SendAsync(
+            new AiAssistantRequest("创建每日例会", AiAssistantMode.Write),
+            CancellationToken.None);
+
+        AiCreationDraft draft = Assert.IsType<AiCreationAssistantProposal>(
+            Assert.Single(result.Proposals)).Draft;
+        // 模型常把用户本地墙钟时间（10:10）误标成 Z 后缀；声明的时区是 Asia/Shanghai，
+        // 应按该时区重新锚定为 02:10 UTC，而不是整段偏移 8 小时。
+        Assert.Equal(
+            DateTimeOffset.Parse("2026-08-24T02:10:00Z", CultureInfo.InvariantCulture),
+            draft.StartAt);
+        Assert.Equal(
+            DateTimeOffset.Parse("2026-08-24T03:10:00Z", CultureInfo.InvariantCulture),
+            draft.EndAt);
     }
 
     [Fact]

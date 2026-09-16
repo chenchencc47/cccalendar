@@ -6,8 +6,8 @@ public sealed class WriteAiToolCatalog
     [
         new(
             "propose_timed_event",
-            "提出定时日程草案。此工具只生成待用户确认的预览，不直接写入。会议地点、腾讯会议号必须分别填写，不要拼进 title。",
-            """{"type":"object","required":["title","startAt","endAt","timeZoneId"],"properties":{"title":{"type":"string"},"startAt":{"type":"string","format":"date-time"},"endAt":{"type":"string","format":"date-time"},"timeZoneId":{"type":"string"},"location":{"type":["string","null"]},"meetingNumber":{"type":["string","null"],"description":"腾讯会议号，例如 365-5683-5623"}}}""",
+            "提出定时日程草案。此工具只生成待用户确认的预览，不直接写入。会议地点、腾讯会议号必须分别填写，不要拼进 title。startAt/endAt 使用用户所在时区的本地时间并带时区偏移（如 2026-08-24T18:10:00+08:00），不要用 Z/UTC 表示。",
+            """{"type":"object","required":["title","startAt","endAt","timeZoneId"],"properties":{"title":{"type":"string"},"startAt":{"type":"string","format":"date-time","description":"用户所在时区的本地时间，带时区偏移，例如 2026-08-24T18:10:00+08:00"},"endAt":{"type":"string","format":"date-time","description":"用户所在时区的本地时间，带时区偏移，例如 2026-08-24T19:10:00+08:00"},"timeZoneId":{"type":"string","description":"用户所在时区 ID，如 Asia/Shanghai 或 China Standard Time"},"location":{"type":["string","null"]},"meetingNumber":{"type":["string","null"],"description":"腾讯会议号，例如 365-5683-5623"}}}""",
             false),
         new(
             "propose_all_day_event",

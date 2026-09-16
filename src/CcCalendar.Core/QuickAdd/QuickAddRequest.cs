@@ -1,3 +1,5 @@
+using CcCalendar.Core.Todos;
+
 namespace CcCalendar.Core.QuickAdd;
 
 public sealed record QuickAddRequest(
@@ -10,4 +12,5 @@ public sealed record QuickAddRequest(
     DateOnly? AllDayEndExclusive = null,
     string? Location = null,
     string? MeetingInvitationText = null,
-    int? ReminderLeadMinutes = null);
+    int? ReminderLeadMinutes = null,
+    TodoQuadrant? Quadrant = null);

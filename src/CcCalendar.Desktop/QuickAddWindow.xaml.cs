@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using CcCalendar.Core.QuickAdd;
 using CcCalendar.Core.Schedules;
+using CcCalendar.Core.Todos;
 using CcCalendar.Desktop.ViewModels;
 using CcCalendar.Desktop.Views;
 
@@ -342,7 +343,11 @@ public partial class QuickAddWindow : Window, INotifyPropertyChanged
 
         if (SelectedOption.Kind != QuickAddKind.Event)
         {
-            Requests = [new QuickAddRequest(SelectedOption.Kind, title, null, null, null)];
+            // 待办类型允许直接选择四象限；其他类型（项目/记录）不涉及象限。
+            TodoQuadrant? quadrant = SelectedOption.Kind == QuickAddKind.Todo
+                ? GetSelectedQuadrant()
+                : null;
+            Requests = [new QuickAddRequest(SelectedOption.Kind, title, null, null, null, Quadrant: quadrant)];
             return true;
         }
 
@@ -396,6 +401,19 @@ public partial class QuickAddWindow : Window, INotifyPropertyChanged
             validationError = exception.Message;
             return false;
         }
+    }
+
+    /// <summary>读取四象限下拉框当前选择；第 0 项“不指定”返回 null，其余映射到对应象限。</summary>
+    private TodoQuadrant? GetSelectedQuadrant()
+    {
+        return QuadrantBox.SelectedIndex switch
+        {
+            1 => TodoQuadrant.ImportantUrgent,
+            2 => TodoQuadrant.ImportantNotUrgent,
+            3 => TodoQuadrant.NotImportantUrgent,
+            4 => TodoQuadrant.NotImportantNotUrgent,
+            _ => null,
+        };
     }
 
     private int? GetReminderLeadMinutes(out string? validationError)
@@ -553,6 +571,13 @@ public partial class QuickAddWindow : Window, INotifyPropertyChanged
                 : Visibility.Collapsed;
             EventFields.Visibility = visibility;
             MeetingInvitationFields.Visibility = visibility;
+        }
+
+        if (TodoFields is not null)
+        {
+            TodoFields.Visibility = SelectedOption?.Kind == QuickAddKind.Todo
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
     }
 

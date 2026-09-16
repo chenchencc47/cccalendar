@@ -81,7 +81,7 @@ public sealed class CalendarDataService
         object entity = request.Kind switch
         {
             QuickAddKind.Project => Project.Create(request.Title, "#246BCE", null, null),
-            QuickAddKind.Todo => TodoItem.Create(request.Title, null, null),
+            QuickAddKind.Todo => CreateTodo(request),
             QuickAddKind.Event => CreateCalendarEvent(request),
             QuickAddKind.Record => WorkRecord.Create(
                 WorkRecordType.WorkLog,
@@ -278,6 +278,17 @@ public sealed class CalendarDataService
             request.Location,
             request.MeetingInvitationText,
             request.ReminderLeadMinutes);
+    }
+
+    private static TodoItem CreateTodo(QuickAddRequest request)
+    {
+        TodoItem todo = TodoItem.Create(request.Title, null, null);
+        if (request.Quadrant.HasValue)
+        {
+            todo.MoveToQuadrant(request.Quadrant.Value);
+        }
+
+        return todo;
     }
 
     private async Task ReplaceEventReminderAsync(

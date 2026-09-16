@@ -48,6 +48,21 @@ public sealed class AppearanceSettingsViewModelTests
     }
 
     [Fact]
+    public void OpacityPercentRoundsFractionalInputToWholePercent()
+    {
+        var viewModel = new AppearanceSettingsViewModel(
+            new DesktopAppearanceSettings(),
+            new DesktopAppearanceSettings(),
+            new DesktopAppearanceSettings(),
+            new DesktopAppearanceSettings());
+
+        viewModel.OpacityPercent = 10.730593607306027;
+
+        Assert.Equal(11, viewModel.OpacityPercent);
+        Assert.Equal(0.11, viewModel.GetSettings(DesktopAppearanceTarget.Workbench).Opacity);
+    }
+
+    [Fact]
     public void ColorPaletteSelectionUpdatesTheSelectedColor()
     {
         var viewModel = new AppearanceSettingsViewModel(

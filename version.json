@@ -1,6 +1,7 @@
 {
   "mandatory": false,
-  "version": "0.5.9",
-  "sha256": "81409611D0367591D30AB05F5346095EAAA456B166D2B9FEBD6349E2DAD992F6",
-  "url": "https://cccalendar-releases-01.oss-cn-heyuan.aliyuncs.com/releases/0.5.9/cccalendar-0.5.9-win-x64-setup.exe"
+  "version": "0.6.6",
+  "releaseNotes": "0.6.6 更新内容：\n\n- 修复 AI 助手创建日程时时间偏移 8 小时的问题。\n- 修复桌面日历因不透明度异常而几乎不可见的问题，设置滑杆改为整数吸附。\n- 快速新增「待办」类型支持四象限选择。\n- 会议室导入模糊匹配增强：支持带城市/楼栋前后缀及缺少单字的场景。",
+  "sha256": "5EC5032FB95EAD42622E7F2115BE9ABBE5DBE6E6F92C63209026F38452C2371B",
+  "url": "https://cccalendar-releases-01.oss-cn-heyuan.aliyuncs.com/releases/0.6.6/cccalendar-0.6.6-win-x64-setup.exe"
 }

@@ -118,8 +118,10 @@ public sealed class AppearanceSettingsViewModel : ObservableObject
 
     public double OpacityPercent
     {
+        // 滑杆拖动/滚轮可能产生任意小数（如 10.730593…%），取整为整数百分比再存储，
+        // 避免持久化精度漂移并保证设置界面显示一致。
         get => Current.Opacity * 100;
-        set => Change(() => state.SetOpacity(value / 100));
+        set => Change(() => state.SetOpacity(Math.Round(value) / 100));
     }
 
     public double CornerRadius

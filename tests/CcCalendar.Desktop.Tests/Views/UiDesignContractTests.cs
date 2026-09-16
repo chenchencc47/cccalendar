@@ -126,7 +126,39 @@ public sealed class UiDesignContractTests
         Assert.Contains("Style=\"{StaticResource PrimaryButtonStyle}\"", mainWindow, StringComparison.Ordinal);
         Assert.Contains("IsUpdateAvailable", mainWindow, StringComparison.Ordinal);
         Assert.Contains("Click=\"UpdateClick\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("点击下载并安装", mainWindow, StringComparison.Ordinal);
+        string appCode = ReadWorkspaceFile("src", "CcCalendar.Desktop", "App.xaml.cs");
+        Assert.Contains("更新内容：", appCode, StringComparison.Ordinal);
+        Assert.Contains("update.ReleaseNotes", appCode, StringComparison.Ordinal);
         Assert.Contains("Material Symbols download asset", mainWindow, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UpdateDownloadRequiresExplicitUserConfirmation()
+    {
+        string appCode = ReadWorkspaceFile("src", "CcCalendar.Desktop", "App.xaml.cs");
+        string manifest = ReadWorkspaceFile("version.json");
+
+        Assert.Contains("_ = CheckForUpdatesAsync();", appCode, StringComparison.Ordinal);
+        Assert.Contains("mainWindow?.SetAvailableUpdate(update);", appCode, StringComparison.Ordinal);
+        Assert.Contains("if (confirmation != MessageBoxResult.Yes)", appCode, StringComparison.Ordinal);
+        Assert.Contains("DownloadInstallerAsync(update", appCode, StringComparison.Ordinal);
+        Assert.Contains("\"mandatory\": false", manifest, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TrayExitHidesIconAndIgnoresLateCallbacks()
+    {
+        string appCode = ReadWorkspaceFile("src", "CcCalendar.Desktop", "App.xaml.cs");
+        string trayCode = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Desktop", "TrayIconService.cs");
+
+        Assert.Contains("trayIcon?.Hide();", appCode, StringComparison.Ordinal);
+        Assert.Contains("if (isExiting)", appCode, StringComparison.Ordinal);
+        Assert.Contains("public void Hide()", trayCode, StringComparison.Ordinal);
+        Assert.Contains("if (isDisposed)", trayCode, StringComparison.Ordinal);
+        Assert.Contains("WaitAsync(TimeSpan.FromSeconds(2))", appCode, StringComparison.Ordinal);
+        Assert.Contains("cccalendar-single-instance", appCode, StringComparison.Ordinal);
+        Assert.Contains("if (!ownsSingleInstanceMutex)", appCode, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -422,6 +454,17 @@ public sealed class UiDesignContractTests
         Assert.Contains("恢复所有桌面组件鼠标操作（Ctrl+Alt+Shift+P）", tray, StringComparison.Ordinal);
         Assert.Contains("关闭全部鼠标穿透", settings, StringComparison.Ordinal);
         Assert.Contains("Ctrl + Alt + Shift + P", settings, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SettingsExposeReleaseNotesAction()
+    {
+        string settingsView = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "SettingsView.xaml");
+        string settingsCode = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "SettingsView.xaml.cs");
+
+        Assert.Contains("查看更新内容", settingsView, StringComparison.Ordinal);
+        Assert.Contains("ReleaseNotesClick", settingsView, StringComparison.Ordinal);
+        Assert.Contains("CurrentReleaseNotes", settingsCode, StringComparison.Ordinal);
     }
 
     [Fact]

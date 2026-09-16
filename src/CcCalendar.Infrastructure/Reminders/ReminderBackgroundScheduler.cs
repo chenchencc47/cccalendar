@@ -29,7 +29,12 @@ public sealed class ReminderBackgroundScheduler : IAsyncDisposable
 
     public void Start()
     {
-        backgroundTask ??= RunAsync(cancellation.Token);
+        // The scheduler performs database I/O and must not inherit the WPF UI
+        // synchronization context. Otherwise shutdown can synchronously wait
+        // for a continuation that is queued behind the closing UI thread.
+        backgroundTask ??= Task.Run(
+            () => RunAsync(cancellation.Token),
+            cancellation.Token);
     }
 
     public async Task<int> RunOnceAsync(CancellationToken cancellationToken)

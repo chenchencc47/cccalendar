@@ -394,8 +394,8 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
             "propose_timed_event" => new AiCreationAssistantProposal(
                 AiCreationDraft.TimedEvent(
                     NormalizeEventTitle(GetRequiredString(arguments, "title"), arguments),
-                    GetDateTimeOffset(arguments, "startAt"),
-                    GetDateTimeOffset(arguments, "endAt"),
+                    GetZonedDateTimeOffset(arguments, "startAt", GetRequiredString(arguments, "timeZoneId")),
+                    GetZonedDateTimeOffset(arguments, "endAt", GetRequiredString(arguments, "timeZoneId")),
                     GetRequiredString(arguments, "timeZoneId"),
                     GetOptionalString(arguments, "location"),
                     GetOptionalString(arguments, "meetingNumber"))),
@@ -498,6 +498,44 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
             GetRequiredString(arguments, propertyName),
             CultureInfo.InvariantCulture,
             DateTimeStyles.RoundtripKind);
+    }
+
+    /// <summary>
+    /// 解析日程时间并按声明的时区锚定：模型常把用户本地墙钟时间误标成 Z 后缀（零偏移），
+    /// 此时按 timeZoneId 的墙钟时间重新锚定，避免创建的日程整体偏移时区差。
+    /// </summary>
+    private static DateTimeOffset GetZonedDateTimeOffset(
+        JsonElement arguments,
+        string propertyName,
+        string timeZoneId)
+    {
+        DateTimeOffset parsed = GetDateTimeOffset(arguments, propertyName);
+        if (parsed.Offset != TimeSpan.Zero)
+        {
+            return parsed;
+        }
+
+        try
+        {
+            TimeSpan zoneOffset = TimeZoneInfo
+                .FindSystemTimeZoneById(timeZoneId)
+                .GetUtcOffset(parsed);
+            if (zoneOffset != TimeSpan.Zero)
+            {
+                return new DateTimeOffset(
+                    DateTime.SpecifyKind(parsed.DateTime, DateTimeKind.Unspecified),
+                    zoneOffset);
+            }
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            // 模型给出的时区 ID 无法识别时保留原解析结果。
+        }
+        catch (InvalidTimeZoneException)
+        {
+        }
+
+        return parsed;
     }
 
     private static DateTimeOffset? GetOptionalDateTimeOffset(

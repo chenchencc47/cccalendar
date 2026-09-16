@@ -201,7 +201,7 @@
                                 Click="UpdateClick"
                                 Style="{StaticResource PrimaryButtonStyle}"
                                 Visibility="{Binding IsUpdateAvailable, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BooleanToVisibilityConverter}}"
-                                ToolTip="{Binding UpdateVersion, RelativeSource={RelativeSource AncestorType=Window}, StringFormat=发现新版本 {0}，点击下载}">
+                                ToolTip="{Binding UpdateVersion, RelativeSource={RelativeSource AncestorType=Window}, StringFormat=发现新版本 {0}，点击下载并安装}">
                             <!-- Path adapted from the supplied Material Symbols download asset. -->
                             <Path Width="17"
                                   Height="17"

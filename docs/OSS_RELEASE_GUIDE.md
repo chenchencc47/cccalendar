@@ -43,6 +43,7 @@ $url = "https://$bucket.oss-$region.aliyuncs.com/releases/$version/cccalendar-$v
   version = $version
   url = $url
   sha256 = $sha256
+  releaseNotes = "${version} 更新内容：`n`n- 在这里填写本版本的修复和新增功能。"
   mandatory = $false
 } | ConvertTo-Json | Set-Content version.json -Encoding UTF8
 
