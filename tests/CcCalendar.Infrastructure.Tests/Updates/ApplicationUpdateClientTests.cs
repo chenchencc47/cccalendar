@@ -115,6 +115,44 @@ public sealed class ApplicationUpdateClientTests
         }
     }
 
+    /// <summary>
+    /// P67：读取清单时**不做版本过滤**。
+    ///
+    /// 修复前「设置 → 查看更新内容」显示的是一段写死在代码里的说明，且版本号停在
+    /// 0.6.5——发版时没人会记得改它。清单本身就带 releaseNotes，直接取即可：
+    /// 远程版本与当前版本相同时，那正是"当前版本"的说明。
+    /// 因此需要一条不过滤版本的读取路径（CheckAsync 在远程不更新时返回 null）。
+    /// </summary>
+    [Fact]
+    public async Task FetchManifestReturnsManifestEvenWhenRemoteIsNotNewer()
+    {
+        using var httpClient = CreateClient(new ApplicationUpdateManifest(
+            "0.6.7",
+            "https://download.example.com/cccalendar-0.6.7-win-x64-setup.exe",
+            "ABC123",
+            ReleaseNotes: "0.6.7 更新内容：界面改版"));
+        var client = new ApplicationUpdateClient(httpClient);
+
+        ApplicationUpdateManifest? manifest = await client.FetchManifestAsync(
+            new Uri("https://download.example.com/version.json"),
+            CancellationToken.None);
+
+        Assert.NotNull(manifest);
+        Assert.Equal("0.6.7", manifest.Version);
+        Assert.Equal("0.6.7 更新内容：界面改版", manifest.ReleaseNotes);
+    }
+
+    /// <summary>非 HTTPS 的清单地址必须拒绝，与 CheckAsync 一致。</summary>
+    [Fact]
+    public async Task FetchManifestRejectsNonHttpsEndpoint()
+    {
+        using var httpClient = new HttpClient();
+        var client = new ApplicationUpdateClient(httpClient);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => client.FetchManifestAsync(
+            new Uri("http://download.example.com/version.json"),
+            CancellationToken.None));
+    }
     private static HttpClient CreateClient(ApplicationUpdateManifest manifest)
     {
         var handler = new StubHandler(manifest);

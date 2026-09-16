@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace CcCalendar.Infrastructure.Updates;
@@ -19,6 +20,37 @@ public sealed class ApplicationUpdateClient
     public ApplicationUpdateClient(HttpClient httpClient)
     {
         this.httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+    }
+
+    /// <summary>
+    /// 读取清单但**不做版本过滤**。
+    ///
+    /// 用途是展示"当前版本"的更新说明：清单里带的 <c>releaseNotes</c> 就是最新一版的说明，
+    /// 当远程版本与本地版本相同时，它正好是用户想看的当前版本内容。
+    /// <see cref="CheckAsync"/> 在远程不更新时返回 <c>null</c>，拿不到这段文字，故单独开一条路径。
+    /// 失败时返回 <c>null</c>（更新检查属于尽力而为，不应影响本地功能）。
+    /// </summary>
+    public async Task<ApplicationUpdateManifest?> FetchManifestAsync(
+        Uri manifestUri,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(manifestUri);
+
+        if (!string.Equals(manifestUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Update manifests must be served over HTTPS.", nameof(manifestUri));
+        }
+
+        try
+        {
+            return await httpClient.GetFromJsonAsync<ApplicationUpdateManifest>(
+                manifestUri,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            return null;
+        }
     }
 
     public async Task<ApplicationUpdateManifest?> CheckAsync(

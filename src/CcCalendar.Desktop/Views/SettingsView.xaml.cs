@@ -8,26 +8,52 @@ namespace CcCalendar.Desktop.Views;
 
 public partial class SettingsView : UserControl
 {
-    private const string CurrentReleaseNotes = "0.6.5 更新内容：\n\n"
-        + "• 修复退出应用后托盘残留图标仍可触发窗口异常的问题。\n"
-        + "• 退出开始时立即隐藏托盘图标，并忽略退出期间到达的托盘操作。\n"
-        + "• 提醒调度器退出最多等待 2 秒，避免后台任务拖住应用进程。\n"
-        + "• 增加单实例保护，重复启动不会再产生多个后台进程。\n"
-        + "• 托盘通知和资源销毁改为可重复调用，减少升级时残留进程。";
-
     public SettingsView()
     {
         InitializeComponent();
+        Loaded += OnSettingsViewLoaded;
     }
 
-    private void ReleaseNotesClick(object sender, System.Windows.RoutedEventArgs e)
+    /// <summary>
+    /// 显示当前版本。此前这里是一句写死的 `Text="当前版本 0.6.5；…"`，
+    /// 发版时无人更新，于是更新到 0.6.7 后界面仍显示 0.6.5。现在从程序集读取。
+    /// </summary>
+    private void OnSettingsViewLoaded(object sender, System.Windows.RoutedEventArgs e)
     {
+        Version version = App.CurrentVersion;
+        CurrentVersionText.Text =
+            $"当前版本 {version.Major}.{version.Minor}.{version.Build}；启动时也会自动检查";
+    }
+
+    /// <summary>
+    /// 查看更新内容。
+    ///
+    /// 说明优先取公网清单的 `releaseNotes`——它随发版一起更新，因此不会像原先写死的常量
+    /// 那样过期（原先点开会看到 0.6.5 的说明）。清单不可达时给出明确提示，
+    /// 而不是展示一份可能是错的旧说明。
+    /// </summary>
+    private async void ReleaseNotesClick(object sender, System.Windows.RoutedEventArgs e)
+    {
+        Window? owner = Window.GetWindow(this);
+        string? notes = null;
+
+        if (System.Windows.Application.Current is App app)
+        {
+            notes = await app.FetchReleaseNotesAsync();
+        }
+
+        Version version = App.CurrentVersion;
+        string heading = $"当前版本 {version.Major}.{version.Minor}.{version.Build}";
+        bool hasNotes = !string.IsNullOrWhiteSpace(notes);
+
         MessageBox.Show(
-            Window.GetWindow(this),
-            CurrentReleaseNotes,
+            owner,
+            hasNotes
+                ? notes
+                : $"{heading}\n\n暂时无法获取更新说明，请检查网络后重试。",
             "cccalendar 更新内容",
             MessageBoxButton.OK,
-            MessageBoxImage.Information);
+            hasNotes ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
 
     private void ShortcutPreviewKeyDown(object sender, KeyEventArgs e)

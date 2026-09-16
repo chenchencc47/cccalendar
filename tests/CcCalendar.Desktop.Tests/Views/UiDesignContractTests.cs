@@ -465,7 +465,11 @@ public sealed class UiDesignContractTests
 
         Assert.Contains("查看更新内容", settingsView, StringComparison.Ordinal);
         Assert.Contains("ReleaseNotesClick", settingsView, StringComparison.Ordinal);
-        Assert.Contains("CurrentReleaseNotes", settingsCode, StringComparison.Ordinal);
+
+        // P67：更新说明改为从公网清单的 releaseNotes 读取，不再写死在代码里
+        // （原先的写死常量会让用户点开看到的是 0.6.5 的旧说明）。
+        Assert.Contains("FetchReleaseNotesAsync", settingsCode, StringComparison.Ordinal);
+        Assert.DoesNotContain("CurrentReleaseNotes", settingsCode, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -639,6 +643,81 @@ public sealed class UiDesignContractTests
         Assert.True(
             offenders.Count == 0,
             "以下页面级留白与统一值不一致：\n" + string.Join("\n", offenders));
+    }
+    /// <summary>
+    /// P67：界面里不得写死版本号。
+    ///
+    /// 修复前「设置 → 应用更新」那行写死 `当前版本 0.6.5；…`，且「查看更新内容」
+    /// 展示的是一段写死的 0.6.5 说明——发版时无人更新，更新到 0.6.7 后界面仍显示 0.6.5。
+    /// 版本号现在只由 csproj 的 &lt;Version&gt; 决定（`App.CurrentVersion`），
+    /// 更新说明取自公网清单的 releaseNotes。
+    /// </summary>
+    [Fact]
+    public void ViewsDoNotHardcodeAnApplicationVersion()
+    {
+        // 与 x.y.z 无关的"版本"用法（数据库 schema、Windows 注册表路径）在此放行，
+        // 它们不是应用版本号。
+        string[] allowed =
+        [
+            "CurrentVersion",        // Windows 注册表路径片段
+            "DatabaseFormat",        // 数据库 schema 版本
+            "SchemaVersion",
+            "schemaVersion",
+            "apiVersion",
+            "minVersion",
+        ];
+
+        string[] sources =
+        [
+            "Views/SettingsView.xaml",
+            "Views/SettingsView.xaml.cs",
+            "MainWindow.xaml",
+            "MainWindow.xaml.cs",
+        ];
+
+        var offenders = new List<string>();
+        foreach (string file in sources)
+        {
+            string[] segments = ["src", "CcCalendar.Desktop", .. file.Split('/')];
+            string content = ReadWorkspaceFile(segments);
+            string[] lines = content.Split('\n');
+
+            for (int index = 0; index < lines.Length; index++)
+            {
+                // 先去掉注释：说明"曾经写死成 0.6.5"的注释本身含版本号，不应算违规。
+                string code = lines[index];
+                int commentAt = code.IndexOf("//", StringComparison.Ordinal);
+                if (commentAt >= 0)
+                {
+                    code = code[..commentAt];
+                }
+
+                int xmlDocAt = code.IndexOf("///", StringComparison.Ordinal);
+                if (xmlDocAt >= 0)
+                {
+                    code = code[..xmlDocAt];
+                }
+
+                System.Text.RegularExpressions.Match match =
+                    System.Text.RegularExpressions.Regex.Match(code, @"\b\d+\.\d+\.\d+\b");
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                if (allowed.Any(token => lines[index].Contains(token, StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                offenders.Add($"{file}:{index + 1} 出现字面版本号 '{match.Value}'：{lines[index].Trim()}");
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            "界面代码里出现写死的版本号，应改用 App.CurrentVersion 或清单的 releaseNotes：\n"
+                + string.Join("\n", offenders));
     }
     private static string ReadWorkspaceFile(params string[] segments)
     {

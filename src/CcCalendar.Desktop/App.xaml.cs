@@ -512,6 +512,52 @@ public partial class App : Application, IDisposable
         mainWindow?.Activate();
     }
 
+    /// <summary>
+    /// 当前程序集版本（唯一来源）。
+    ///
+    /// 此前"设置 → 应用更新"那行文字把版本号**写死**成 `0.6.5`，发版时无人更新它，
+    /// 更新到 0.6.7 后界面仍显示 0.6.5。改为统一从程序集读取：
+    /// 版本号只由 `CcCalendar.Desktop.csproj` 的 `&lt;Version&gt;` 决定。
+    /// </summary>
+    internal static Version CurrentVersion
+        => typeof(App).Assembly.GetName().Version ?? new Version(0, 0, 0);
+
+    /// <summary>
+    /// 取回清单里的更新说明，供「设置 → 查看更新内容」展示。
+    ///
+    /// 走不做版本过滤的读取路径：远程通常已是最新一版，其 `releaseNotes` 正是用户
+    /// 想看的当前版本说明。不可达时返回 <c>null</c>，由调用方给出明确提示。
+    /// </summary>
+    internal async Task<string?> FetchReleaseNotesAsync()
+    {
+        string? manifestText = Environment.GetEnvironmentVariable("CCCALENDAR_UPDATE_MANIFEST_URL");
+        if (string.IsNullOrWhiteSpace(manifestText))
+        {
+            manifestText = DefaultUpdateManifestUrl;
+        }
+
+        if (!Uri.TryCreate(manifestText, UriKind.Absolute, out Uri? manifestUri)
+            || !string.Equals(manifestUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        try
+        {
+            updateHttpClient ??= new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            var updateClient = new ApplicationUpdateClient(updateHttpClient);
+            ApplicationUpdateManifest? manifest = await updateClient.FetchManifestAsync(
+                manifestUri,
+                CancellationToken.None);
+            return manifest?.ReleaseNotes;
+        }
+        catch (Exception)
+        {
+            // 取说明失败不应影响任何本地功能。
+            return null;
+        }
+    }
+
     internal async Task<UpdateCheckResult> CheckForUpdatesAsync(Window? owner = null)
     {
         string? manifestText = Environment.GetEnvironmentVariable("CCCALENDAR_UPDATE_MANIFEST_URL");
@@ -525,11 +571,11 @@ public partial class App : Application, IDisposable
         {
             return new UpdateCheckResult(
                 UpdateCheckStatus.Skipped,
-                typeof(App).Assembly.GetName().Version ?? new Version(0, 0, 0),
+                CurrentVersion,
                 Error: "更新地址未配置或不是 HTTPS 地址。");
         }
 
-        Version currentVersion = typeof(App).Assembly.GetName().Version ?? new Version(0, 0, 0);
+        Version currentVersion = CurrentVersion;
         try
         {
             updateHttpClient ??= new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
