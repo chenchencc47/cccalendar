@@ -22,19 +22,19 @@
 
         <UniformGrid Grid.Row="2" Columns="5" Rows="1">
             <Border Margin="0,0,10,0" Padding="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0.5" CornerRadius="6" Effect="{DynamicResource ElevationPanelEffect}">
-                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="项目" /><TextBlock Margin="0,8,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding ProjectCount}" /></StackPanel>
+                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="项目" /><TextBlock Margin="0,8,0,0" FontSize="{DynamicResource FontStatNumberSize}" FontWeight="SemiBold" Text="{Binding ProjectCount}" /></StackPanel>
             </Border>
             <Border Margin="0,0,10,0" Padding="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0.5" CornerRadius="6" Effect="{DynamicResource ElevationPanelEffect}">
-                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="待办" /><TextBlock Margin="0,8,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding TotalTodos}" /></StackPanel>
+                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="待办" /><TextBlock Margin="0,8,0,0" FontSize="{DynamicResource FontStatNumberSize}" FontWeight="SemiBold" Text="{Binding TotalTodos}" /></StackPanel>
             </Border>
             <Border Margin="0,0,10,0" Padding="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0.5" CornerRadius="6" Effect="{DynamicResource ElevationPanelEffect}">
-                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="已完成" /><TextBlock Margin="0,8,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding CompletedTodos}" /></StackPanel>
+                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="已完成" /><TextBlock Margin="0,8,0,0" FontSize="{DynamicResource FontStatNumberSize}" FontWeight="SemiBold" Text="{Binding CompletedTodos}" /></StackPanel>
             </Border>
             <Border Margin="0,0,10,0" Padding="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0.5" CornerRadius="6" Effect="{DynamicResource ElevationPanelEffect}">
-                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="逾期" /><TextBlock Margin="0,8,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding OverdueTodos}" /></StackPanel>
+                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="逾期" /><TextBlock Margin="0,8,0,0" FontSize="{DynamicResource FontStatNumberSize}" FontWeight="SemiBold" Text="{Binding OverdueTodos}" /></StackPanel>
             </Border>
             <Border Padding="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource HairlineBrush}" BorderThickness="0.5" CornerRadius="6" Effect="{DynamicResource ElevationPanelEffect}">
-                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="专注分钟" /><TextBlock Margin="0,8,0,0" FontSize="24" FontWeight="SemiBold" Text="{Binding FocusMinutes}" /></StackPanel>
+                <StackPanel><TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="专注分钟" /><TextBlock Margin="0,8,0,0" FontSize="{DynamicResource FontStatNumberSize}" FontWeight="SemiBold" Text="{Binding FocusMinutes}" /></StackPanel>
             </Border>
         </UniformGrid>
 
@@ -55,7 +55,7 @@
                             <StackPanel VerticalAlignment="Bottom">
                                 <TextBlock Margin="0,0,0,2"
                                            HorizontalAlignment="Center"
-                                           FontSize="11"
+                                           FontSize="{DynamicResource FontCaptionSize}"
                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                            Text="{Binding Count}" />
                                 <Border Width="28"

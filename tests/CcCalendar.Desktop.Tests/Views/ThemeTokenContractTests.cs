@@ -367,6 +367,63 @@ public sealed class ThemeTokenContractTests
     /// 圆角值 → 应有的令牌名（P61-03 刻度）。
     /// 用于在失败信息里指出该改用哪个令牌，因此必须与实际刻度一致。
     /// </summary>
+    /// <summary>
+    /// P62：页面里不得再出现未归档的字号字面量。
+    ///
+    /// 字号阶梯见 Theme.xaml：12/13/14/16/18/20/24/32/44。
+    /// 桌面组件（DesktopComponentWindow / DesktopWorkbenchWindow / QuickPanelWindow）
+    /// 与提醒弹窗是**明确豁免**的紧凑型表面，见 <see cref="CompactSurfaceFiles"/>。
+    /// </summary>
+    [Fact]
+    public void ViewsUseOnlyArchivedFontSizes()
+    {
+        string[] ladder = ["12", "13", "14", "16", "18", "20", "24", "32", "44"];
+        var offenders = new List<string>();
+
+        foreach (string file in PageXamlFiles)
+        {
+            string[] segments = ["src", "CcCalendar.Desktop", .. file.Split('/')];
+            string content = ReadWorkspaceFile(segments);
+
+            foreach (System.Text.RegularExpressions.Match match in
+                System.Text.RegularExpressions.Regex.Matches(content, "FontSize=\"(\\d+)\""))
+            {
+                string value = match.Groups[1].Value;
+                if (!ladder.Contains(value, StringComparer.Ordinal))
+                {
+                    offenders.Add($"{file}: FontSize=\"{value}\"");
+                }
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            "以下字号不在阶梯（12/13/14/16/18/20/24/32/44）内，应改用令牌或并入阶梯：\n"
+                + string.Join("\n", offenders));
+    }
+
+    /// <summary>页面与主窗口 XAML（不含刻意豁免的紧凑型桌面表面）。</summary>
+    private static readonly string[] PageXamlFiles =
+    [
+        "MainWindow.xaml",
+        "QuickAddWindow.xaml",
+        "EventEditWindow.xaml",
+        "DayScheduleWindow.xaml",
+        "MeetingDetailsWindow.xaml",
+        "MeetingExportWindow.xaml",
+        "ColorPickerWindow.xaml",
+        "DesktopSizeWindow.xaml",
+        "Views/AssistantView.xaml",
+        "Views/CalendarView.xaml",
+        "Views/ProjectView.xaml",
+        "Views/RecordView.xaml",
+        "Views/SettingsView.xaml",
+        "Views/StatisticsView.xaml",
+        "Views/TodayView.xaml",
+        "Views/TodoView.xaml",
+        "Views/ToolsView.xaml",
+        "Views/RoomBookingPicker.xaml",
+    ];
     private static string RadiusTokenFor(string value) => value switch
     {
         "6" => "RadiusMd",

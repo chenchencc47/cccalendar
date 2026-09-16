@@ -193,7 +193,7 @@
                                                     </TextBlock.Style>
                                                 </TextBlock>
                                                 <TextBlock Margin="0,3,0,0"
-                                                           FontSize="11"
+                                                           FontSize="{DynamicResource FontCaptionSize}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                                            Text="{Binding DueText}" />
                                             </StackPanel>
@@ -282,8 +282,8 @@
                                     <StackPanel Width="76" Background="Transparent">
                                         <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding TimeLabel}" />
                                         <TextBlock Margin="0,3,0,0" FontWeight="SemiBold" Text="{Binding Temperature}" />
-                                        <TextBlock Margin="0,2,0,0" FontSize="11" Text="{Binding Condition}" />
-                                        <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Precipitation}" />
+                                        <TextBlock Margin="0,2,0,0" FontSize="{DynamicResource FontCaptionSize}" Text="{Binding Condition}" />
+                                        <TextBlock Margin="0,2,0,0" FontSize="{DynamicResource FontCaptionSize}" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Precipitation}" />
                                     </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -296,7 +296,7 @@
                             <DataTemplate>
                                 <StackPanel>
                                     <TextBlock Text="{Binding Date, StringFormat={}{0:M月d日}}" />
-                                    <TextBlock Margin="0,3,0,0" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Condition}" />
+                                    <TextBlock Margin="0,3,0,0" FontSize="{DynamicResource FontCaptionSize}" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding Condition}" />
                                     <TextBlock Margin="0,3,0,0" FontWeight="SemiBold" Text="{Binding TemperatureRange}" />
                                 </StackPanel>
                             </DataTemplate>

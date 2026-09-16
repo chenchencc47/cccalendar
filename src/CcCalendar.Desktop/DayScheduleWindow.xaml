@@ -1,4 +1,4 @@
-<Window x:Class="CcCalendar.Desktop.DayScheduleWindow"
+﻿<Window x:Class="CcCalendar.Desktop.DayScheduleWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
@@ -28,7 +28,7 @@
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        Text="{Binding CountText}" />
-            <TextBlock FontSize="18" FontWeight="SemiBold" Text="{Binding DateText}" />
+            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="{Binding DateText}" />
         </DockPanel>
         <TextBlock Grid.Row="2"
                    FontSize="12"

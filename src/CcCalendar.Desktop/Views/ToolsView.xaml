@@ -1,4 +1,4 @@
-<UserControl x:Class="CcCalendar.Desktop.Views.ToolsView"
+﻿<UserControl x:Class="CcCalendar.Desktop.Views.ToolsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks">
@@ -12,10 +12,10 @@
         <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                 <TextBlock VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="今日专注" />
-                <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontSize="18" FontWeight="SemiBold" Text="{Binding TodayFocusMinutes}" />
+                <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource FontBrandSize}" FontWeight="SemiBold" Text="{Binding TodayFocusMinutes}" />
                 <TextBlock Margin="4,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="分钟" />
                 <TextBlock Margin="18,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="番茄" />
-                <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontSize="18" FontWeight="SemiBold" Text="{Binding TodayPomodoroCount}" />
+                <TextBlock Margin="8,0,0,0" VerticalAlignment="Center" FontSize="{DynamicResource FontBrandSize}" FontWeight="SemiBold" Text="{Binding TodayPomodoroCount}" />
             </StackPanel>
             <TextBlock Style="{StaticResource PageTitleStyle}" Text="工具中心" />
         </DockPanel>
@@ -92,7 +92,7 @@
                                          ToolTip="输入 1 到 1440 分钟" />
                                 <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="分钟" />
                             </StackPanel>
-                            <TextBlock Margin="0,18,0,0" FontSize="44" FontWeight="SemiBold" Text="{Binding CountdownText}" />
+                            <TextBlock Margin="0,18,0,0" FontSize="{DynamicResource FontTimerSize}" FontWeight="SemiBold" Text="{Binding CountdownText}" />
                             <TextBlock Margin="0,6,0,0" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding CountdownStatus}" />
                             <StackPanel Margin="0,22,0,0" Orientation="Horizontal">
                                 <Button MinWidth="88" Command="{Binding ToggleCountdownCommand}" Content="{Binding CountdownActionText}" Style="{StaticResource PrimaryButtonStyle}" />
@@ -121,7 +121,7 @@
                                          ToolTip="休息时长（分钟）" />
                                 <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" Text="分钟" />
                             </StackPanel>
-                            <TextBlock Margin="0,18,0,0" FontSize="44" FontWeight="SemiBold" Text="{Binding PomodoroText}" />
+                            <TextBlock Margin="0,18,0,0" FontSize="{DynamicResource FontTimerSize}" FontWeight="SemiBold" Text="{Binding PomodoroText}" />
                             <StackPanel Margin="0,44,0,0" Orientation="Horizontal">
                                 <Button MinWidth="88" Command="{Binding TogglePomodoroCommand}" Content="{Binding PomodoroActionText}" Style="{StaticResource PrimaryButtonStyle}" />
                                 <Button MinWidth="88" Margin="8,0,0,0" Command="{Binding ResetPomodoroCommand}" Content="重置" />

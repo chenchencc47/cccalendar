@@ -1148,6 +1148,19 @@ Verify：完整验证命令、结果、必要的人工检查
   - 未在本切片做的部分（明确记录）：`View` 级的区块间距（`Margin="24,20,24,28"` 这类）未逐一重排。逐页调整 28 个文件的间距属于高回归风险、低可验证性的工作，且截图显示当前各页留白已可接受；若后续仍需调整，应逐页单独切片并用截图对比。
   - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **514/514**（Core 93、Infrastructure 104、Desktop 273、Server 44）。
 
+## P62 - 字号阶梯归位（承接 P61 遗留）
+
+- [x] P62 把散落在页面里的非阶梯字号归入字号阶梯。
+  - 实测台账比方案预估的"约 20 处"多得多：**`FontSize="18"` 8 处、`24` 5 处、`44` 2 处、`11`/`10` 26 处**，另有一批 `9`/`10` 在桌面组件里。
+  - 分三类处理：
+    - **18pt 区块/窗口标题（8 处）** → `SectionTitleStyle`（16）。涉及 `ProjectView`、`DayScheduleWindow`、`DesktopSizeWindow`、`EventEditWindow`、`ColorPickerWindow`、`QuickAddWindow` 与 `ToolsView` 标题。
+    - **`11`/`10` 正文与小标签（26 处）** → `FontCaptionSize`（12）。涉及 `CalendarView`(11)、`TodayView`(4)、`ProjectView`(4)、`TodoView`(3)、`AssistantView`/`RecordView`/`RoomBookingPicker`/`StatisticsView` 各 1。原先 10/11 两档混用，现在统一到阶梯上的 12。
+    - **大字读数新增两档令牌**：`FontBrandSize` 18（品牌字标 + 工具页统计数字）、`FontTimerSize` 44（倒计时/番茄钟大数字）、`FontStatNumberSize` **24**（统计卡 KPI 数字）。
+  - **一次自我纠错（值得记录）**：最初把统计卡的 24 也压到 18，截图一看 KPI **明显"没分量"**——读者是靠数字大小判断"这是重点数据"而不是普通标签。24 本身没错，错在它是字面量；于是新增 `FontStatNumberSize=24` 令牌把它恢复。教训：**"归入阶梯"不等于"往小改"，该做的是给真实用到的尺寸补令牌**。
+  - **刻意豁免并写明理由**（不是漏改）：`DesktopComponentWindow`/`DesktopWorkbenchWindow`/`QuickPanelWindow` 的 `9`/`10`/`11`，以及 `ReminderPopupWindow` 的 `15`。这些是**紧凑型表面**——桌面组件是用户可缩到 220px 宽的小挂件，字号由组件的"缩放/字号"设置单独驱动；提醒弹窗 380×190 固定尺寸。把它们并进 12 会挤爆既有布局，而这三个窗口**只有源码文本断言、没有运行时布局测试**（桌面组件的布局回归无法被自动化捕获），因此不动、留待单独一轮带人工核验处理。
+  - Red→Green：新增契约测试 `ViewsUseOnlyArchivedFontSizes`（扫描 18 个页面/窗口 XAML，断言只出现阶梯 12/13/14/16/18/20/24/32/44 内的字号；豁免文件由 `PageXamlFiles` 白名单显式排除）。实现前该测试会列出全部非阶梯字号。
+  - 文档：`docs/UI_DESIGN.md` §2.4 令牌表补充 `FontBrandSize`/`FontStatNumberSize`/`FontTimerSize` 三档并说明用途。
+  - Verify：`eng\verify.cmd` 退出 0；format check 通过；build **0 警告 0 错误**；完整回归 **515/515**（Core 93、Infrastructure 104、Desktop 274、Server 44）；浅色 1366×768 逐页截图核验（日历月格、统计卡、工具页字号层级正常，无截断）。
 ## P62 - 会议室看板与会议邀请工作流
 
 ## P19 - AI 助理体检后续（见 docs/ASSISTANT_WORKLIST.md）

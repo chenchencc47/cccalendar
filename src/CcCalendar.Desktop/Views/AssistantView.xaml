@@ -140,7 +140,7 @@
                                         CornerRadius="12">
                                     <TextBlock HorizontalAlignment="Center"
                                                VerticalAlignment="Center"
-                                               FontSize="11"
+                                               FontSize="{DynamicResource FontCaptionSize}"
                                                FontWeight="SemiBold"
                                                Foreground="White">
                                         <TextBlock.Style>

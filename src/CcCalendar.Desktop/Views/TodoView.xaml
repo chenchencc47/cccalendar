@@ -74,7 +74,7 @@
                                 </Style.Triggers>
                             </Style>
                         </Border.Style>
-                        <TextBlock FontSize="10"
+                        <TextBlock FontSize="{DynamicResource FontCaptionSize}"
                                    FontWeight="SemiBold"
                                    Foreground="White"
                                    HorizontalAlignment="Center"
@@ -113,7 +113,7 @@
                         <!-- Meta line: due time + subtask progress -->
                         <StackPanel Margin="0,4,0,0"
                                     Orientation="Horizontal">
-                            <TextBlock FontSize="11"
+                            <TextBlock FontSize="{DynamicResource FontCaptionSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        Text="{Binding DueAtUtc, StringFormat=截止 {0:MM/dd}}">
                                 <TextBlock.Style>
@@ -129,7 +129,7 @@
                             </TextBlock>
 
                             <TextBlock Margin="8,0,0,0"
-                                       FontSize="11"
+                                       FontSize="{DynamicResource FontCaptionSize}"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        Text="{Binding ProgressPercent, StringFormat={}{0}%}">
                                 <TextBlock.Style>

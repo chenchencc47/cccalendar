@@ -1,4 +1,4 @@
-<Window x:Class="CcCalendar.Desktop.ColorPickerWindow"
+﻿<Window x:Class="CcCalendar.Desktop.ColorPickerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="更多颜色"
@@ -19,7 +19,7 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
-        <TextBlock FontSize="18" FontWeight="SemiBold" Text="自定义颜色" />
+        <TextBlock Style="{StaticResource SectionTitleStyle}" Text="自定义颜色" />
         <Border x:Name="ColorPreview"
                 Grid.Row="2"
                 Height="44"
