@@ -53,7 +53,7 @@
     <TabControl Background="Transparent" BorderThickness="0">
         <TabItem Header="桌面外观">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <Grid Margin="24,20,32,32" MaxWidth="920" HorizontalAlignment="Left">
+                <Grid Margin="24,20,24,24" MaxWidth="920" HorizontalAlignment="Left">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -312,7 +312,7 @@
             </ScrollViewer>
         </TabItem>
         <TabItem Header="全局快捷键">
-            <Grid Margin="24,20,32,32" MaxWidth="920" HorizontalAlignment="Left" DataContext="{Binding Shortcuts}">
+            <Grid Margin="24,20,24,24" MaxWidth="920" HorizontalAlignment="Left" DataContext="{Binding Shortcuts}">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <TextBlock Style="{StaticResource PageTitleStyle}" Text="全局快捷键" />
                 <TextBlock Grid.Row="1"
@@ -352,7 +352,7 @@
             </Grid>
         </TabItem>
         <TabItem Header="提醒">
-            <Grid Margin="24,20,32,32" MaxWidth="920" HorizontalAlignment="Left" DataContext="{Binding ReminderNotifications}">
+            <Grid Margin="24,20,24,24" MaxWidth="920" HorizontalAlignment="Left" DataContext="{Binding ReminderNotifications}">
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <TextBlock Style="{StaticResource PageTitleStyle}" Text="提醒" />
                 <StackPanel Grid.Row="1" Margin="0,18,0,0">
@@ -422,7 +422,7 @@
             </Grid>
         </TabItem>
         <TabItem Header="AI 模型">
-            <Grid Margin="24,20,32,32"
+            <Grid Margin="24,20,24,24"
                   MaxWidth="920"
                   HorizontalAlignment="Left"
                   DataContext="{Binding Ai}">
@@ -577,7 +577,7 @@
         </TabItem>
         <TabItem Header="团队连接">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <Grid Margin="24,20,32,32" MaxWidth="920" HorizontalAlignment="Left" DataContext="{Binding TeamConnection}">
+                <Grid Margin="24,20,24,24" MaxWidth="920" HorizontalAlignment="Left" DataContext="{Binding TeamConnection}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />

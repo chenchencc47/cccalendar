@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 
 namespace CcCalendar.Desktop.Tests.Views;
@@ -585,6 +586,60 @@ public sealed class UiDesignContractTests
         Assert.Contains("OverlayScrimBrush", regionSelector, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// P65：页面级留白必须统一，不能在页面之间各写一套。
+    ///
+    /// 修复前实测 4 种值并存：`24,20,24,24`（7 页）、`28,24,28,28`（助手页）、
+    /// `24,20,32,32`（设置页 5 处）、`22,18,22,16`（日程编辑/当日日程窗口），
+    /// 切页时内容起始位置会横向跳动。
+    ///
+    /// 注意本契约只管**区块级**留白（四边都 >= 12 的那种）。诸如 `8,0,0,0`
+    /// （图标→文字）、`4,0,0,0` 属于**行内**间距，不在 UI_DESIGN §2.2 的
+    /// 4/8/12/16/24 基线管辖范围内，强行归并会把密集行撑肿。
+    /// </summary>
+    [Fact]
+    public void PageLevelPaddingIsUniformAcrossViews()
+    {
+        string canonical = "24,20,24,24";
+        string[] files =
+        [
+            "Views/AssistantView.xaml",
+            "Views/CalendarView.xaml",
+            "Views/ProjectView.xaml",
+            "Views/RecordView.xaml",
+            "Views/SettingsView.xaml",
+            "Views/StatisticsView.xaml",
+            "Views/TodayView.xaml",
+            "Views/TodoView.xaml",
+            "Views/ToolsView.xaml",
+            "DayScheduleWindow.xaml",
+            "EventEditWindow.xaml",
+        ];
+
+        var offenders = new List<string>();
+        foreach (string file in files)
+        {
+            string[] segments = ["src", "CcCalendar.Desktop", .. file.Split('/')];
+            string content = ReadWorkspaceFile(segments);
+
+            foreach (System.Text.RegularExpressions.Match match in
+                System.Text.RegularExpressions.Regex.Matches(content, "Margin=\"(\\d+,\\d+,\\d+,\\d+)\""))
+            {
+                string value = match.Groups[1].Value;
+                string[] parts = value.Split(',');
+                bool blockLevel = int.Parse(parts[0], CultureInfo.InvariantCulture) >= 12
+                    && int.Parse(parts[2], CultureInfo.InvariantCulture) >= 12;
+                if (blockLevel && value != canonical)
+                {
+                    offenders.Add($"{file}: Margin=\"{value}\"（应为 {canonical}）");
+                }
+            }
+        }
+
+        Assert.True(
+            offenders.Count == 0,
+            "以下页面级留白与统一值不一致：\n" + string.Join("\n", offenders));
+    }
     private static string ReadWorkspaceFile(params string[] segments)
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

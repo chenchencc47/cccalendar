@@ -12,7 +12,7 @@
         ShowInTaskbar="False"
         AutomationProperties.Name="编辑日程窗口"
         WindowStartupLocation="CenterOwner">
-    <Grid Margin="22,18,22,16">
+    <Grid Margin="24,20,24,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="18" />

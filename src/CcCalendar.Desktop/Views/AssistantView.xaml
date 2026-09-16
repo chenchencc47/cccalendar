@@ -9,7 +9,7 @@
              d:DesignHeight="680"
              d:DesignWidth="960"
              mc:Ignorable="d">
-    <Grid Margin="28,24,28,28">
+    <Grid Margin="24,20,24,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="18" />
