@@ -1124,7 +1124,23 @@ Verify：完整验证命令、结果、必要的人工检查
   - 人工核验结论：浅色/深色下卡片均为"略高于页面的表面 + 极淡描边"（不再是 1px 表格线），导航项圆角与普通按钮一致，`统计` 五张卡在深色下层次清晰。
   - Verify：`eng\verify.cmd` 退出 0；build 0 警告 0 错误；完整回归 **507/507**。
 
-- [ ] P61-05 其余交互控件接入动效：`ComboBoxItem`、`TabItem`、`MenuItem`、`ToggleButton`（四处的悬停仍是瞬间换色）。
+- [x] P61-05 动效铺到全部交互控件：`ComboBoxItem`、`TabItem`、`MenuItem`、`SegmentToggleStyle`、`Expander` 头部。
+  - 复用 P61-01 的叠加层模式，共 **9 个叠加层**：`ButtonTint`、`PrimaryButtonTint`、`ListItemTint`、`NavigationTint`、`ComboItemTint`、`TabTint`、`ToggleTint`、`MenuItemTint`、`HeaderTint`。
+  - 同时把仍是 `RadiusLg` 的按钮/开关/标签页圆角统一为 `RadiusSm`，与按钮刻度一致。
+  - 刻意保留：`Slider` thumb 的 `AccentHoverBrush`——它的悬停语义是"填充强调色"，不是叠加。
+  - Verify：新增契约测试 `EveryInteractiveTemplateUsesAnAnimatedTintOverlay`（断言 9 个叠加层存在 + 8 处瞬间换色写法已清除）；`eng\verify.cmd` 退出 0；build 0 警告 0 错误；完整回归 **508/508**。
+
+- [x] P61-03 微组件库：加载环、状态点、连接状态指示器。
+  - 主题此前**没有任何加载/状态指示控件**，需要"正在加载"的地方只能用文字代替。
+  - 新增 `Controls\LoadingRing`：下环（淡）+ 上弧（强调色）旋转。直径统一按 16 画再用 `ScaleTransform` 缩放到 `SpinnerSize`，保证改尺寸时弧半径与描边一起缩放；`IsActive=false` 时停表并折叠，避免离屏动画持续占用渲染线程。
+  - 新增 `Controls\StateDot`：8px 状态点 + 可选呼吸光晕（缩放 + 淡出，AutoReverse）。颜色由 `StateBrushKey` 传**主题令牌名**（`SuccessBrush`/`AccentBrush`/`DangerBrush`…）而不是直接给 Brush，因此深浅主题各自解析。画刷**每实例独立创建**——共享可变 Freezable 会让一个状态点的改动串到所有实例。
+  - 新增 `Controls\ConnectionIndicator`：`StateDot` + 文案，三态优先级「连接中（强调色 + 呼吸）> 已连接（成功色静点）> 未连接（次要文字色静点）」。
+  - 接入真实场景：设置页「团队连接」的状态显示改为该指示器，绑定 `IsAuthenticated`/`IsBusy`/`StatusMessage`；并移除原来与它重复的「登录状态：True/False」文本行。
+  - 新增令牌：`SpinnerSize`/`SpinnerStrokeThickness`/`StateDotSize`/`StateDotActiveSize`（double）、`SpinDuration`(0.9s)/`PulseDuration`(1.2s)（Duration）。
+  - **踩坑**：`Storyboard` 的 `Target` 指向 `TransformGroup` 内的 `RotateTransform` 时解析不稳定（`FindName` 能取到对象但角度不推进）；改为对 transform 直接 `BeginAnimation`，只依赖对象引用，行为确定。`x:Shared="False"` 也不能写在 `<Grid.Resources>` 里（那是 ResourceDictionary 顶层指令），故改为代码建画刷。
+  - Verify：新增 `MicroComponentTests` 6 项（令牌类型、加载环怠速隐藏/激活旋转且**断言角度真的在变**、状态点仅在要求时呼吸且**断言光晕真的在变**、状态点解析主题令牌取色、连接指示器三态映射、设置页确实接上了指示器）；`eng\verify.cmd` 退出 0；build 0 警告 0 错误；完整回归 **513/513**（Core 93、Infrastructure 104、Desktop 273、Server 44）。
+
+- [ ] P61-06b 留白与层级重排：控件高度 32→36、区块间距按 8/16/24 基线重排（需逐页截图确认，避免破坏既有布局）。
 - [ ] P61-06 留白与层级：按参考实现拉开控件高度与区块留白；评估"抬高表面改用 0.5px 描边 + 柔和阴影替代 1px 硬边框"（需先新增阴影令牌，当前主题 0 个阴影）。
 
 ## P62 - 会议室看板与会议邀请工作流

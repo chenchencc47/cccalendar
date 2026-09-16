@@ -1,0 +1,39 @@
+<UserControl x:Class="CcCalendar.Desktop.Controls.LoadingRing"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             IsHitTestVisible="False"
+             Focusable="False"
+             Width="{DynamicResource SpinnerSize}"
+             Height="{DynamicResource SpinnerSize}">
+    <!--
+        P61-03 加载环。主题此前没有任何加载指示控件，需要"正在加载"的地方
+        只能用文字代替。
+
+        结构：下环（极淡）+ 上弧（强调色），上弧绕中心旋转。
+        直径统一按 16 画，再用 ScaleTransform 缩放到 SpinnerSize —— 这样只有
+        一个尺寸来源，改 SpinnerSize 时弧的半径与描边一起缩放，不会出现
+        "环变大了但缺口还是按 16 画的"这种错位。
+        旋转由 IsActive 触发；不激活时停表，避免离屏动画持续占用渲染线程。
+    -->
+    <Grid>
+        <Ellipse x:Name="TrackRing"
+                 Stroke="{DynamicResource BorderBrush}"
+                 StrokeThickness="{DynamicResource SpinnerStrokeThickness}"
+                 Width="16"
+                 Height="16" />
+        <Path x:Name="ArcRing"
+              Stroke="{DynamicResource AccentBrush}"
+              StrokeThickness="{DynamicResource SpinnerStrokeThickness}"
+              StrokeStartLineCap="Round"
+              StrokeEndLineCap="Round"
+              Data="M 8,0 A 8,8 0 0 1 16,8"
+              RenderTransformOrigin="0.5,0.5">
+            <Path.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="ArcScale" ScaleX="1" ScaleY="1" />
+                    <RotateTransform x:Name="ArcRotation" Angle="0" />
+                </TransformGroup>
+            </Path.RenderTransform>
+        </Path>
+    </Grid>
+</UserControl>

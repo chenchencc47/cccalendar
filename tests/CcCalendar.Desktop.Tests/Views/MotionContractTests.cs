@@ -183,6 +183,53 @@ public sealed class MotionContractTests
         });
     }
 
+    /// <summary>
+    /// P61-05：所有可交互控件模板都必须通过叠加层做过渡，而不是瞬间换不透明底色。
+    ///
+    /// 断言两件事：每个控件模板里都有命名叠加层；且模板中不再出现
+    /// 「直接给背景设 HoverBrush」的瞬间换色写法（Slider thumb 除外——它的悬停
+    /// 语义就是填充强调色，不是叠加）。
+    /// </summary>
+    [Fact]
+    public void EveryInteractiveTemplateUsesAnAnimatedTintOverlay()
+    {
+        string theme = ReadWorkspaceFile(ThemeRelativePath.Split('/'));
+
+        string[] expectedTints =
+        [
+            "ButtonTint",
+            "PrimaryButtonTint",
+            "ListItemTint",
+            "NavigationTint",
+            "ComboItemTint",
+            "TabTint",
+            "ToggleTint",
+            "MenuItemTint",
+            "HeaderTint",
+        ];
+
+        foreach (string tint in expectedTints)
+        {
+            Assert.Contains($"x:Name=\"{tint}\"", theme, StringComparison.Ordinal);
+        }
+
+        // 瞬间换色写法应已清除（Slider thumb 的 AccentHoverBrush 是刻意的填充语义）。
+        foreach (string instant in new[]
+        {
+            "TargetName=\"ButtonBorder\" Property=\"Background\" Value=\"{DynamicResource HoverBrush}\"",
+            "TargetName=\"ListItemBorder\" Property=\"Background\" Value=\"{DynamicResource HoverBrush}\"",
+            "TargetName=\"ItemBorder\" Property=\"Background\" Value=\"{DynamicResource HoverBrush}\"",
+            "TargetName=\"ComboItemBorder\" Property=\"Background\" Value=\"{DynamicResource HoverBrush}\"",
+            "TargetName=\"TabBorder\" Property=\"Background\" Value=\"{DynamicResource HoverBrush}\"",
+            "TargetName=\"ToggleBorder\" Property=\"Background\" Value=\"{DynamicResource HoverBrush}\"",
+            "TargetName=\"MenuItemBorder\" Property=\"Background\" Value=\"{DynamicResource HoverBrush}\"",
+            "TargetName=\"HeaderBorder\" Property=\"Background\" Value=\"{DynamicResource HoverBrush}\"",
+        })
+        {
+            Assert.DoesNotContain(instant, theme, StringComparison.Ordinal);
+        }
+    }
+
     private static Border FindTint(DependencyObject root, string name)
     {
         if (root is FrameworkElement element && element.Name == name && element is Border border)

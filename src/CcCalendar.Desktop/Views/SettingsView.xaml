@@ -1,7 +1,8 @@
-<UserControl x:Class="CcCalendar.Desktop.Views.SettingsView"
+﻿<UserControl x:Class="CcCalendar.Desktop.Views.SettingsView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:core="clr-namespace:CcCalendar.Core.Configuration;assembly=CcCalendar.Core"
+                xmlns:controls="clr-namespace:CcCalendar.Desktop.Controls"
              xmlns:desktop="clr-namespace:CcCalendar.Desktop.Desktop"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -615,9 +616,17 @@
                     <StackPanel Grid.Row="3" Margin="0,18,0,0" Orientation="Horizontal">
                         <Button MinWidth="120" Command="{Binding LoginCommand}" Content="登录团队" Style="{StaticResource PrimaryButtonStyle}" />
                         <Button MinWidth="120" Margin="8,0,0,0" Command="{Binding LogoutCommand}" Content="退出登录" />
-                        <TextBlock Margin="16,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding StatusMessage}" />
+                        <!--
+                            P61-03：连接状态改为「状态点 + 文案」。连接中为强调色呼吸点，
+                           已连接为成功色静点；原先此处纯文字，且与下一行的"登录状态：True/False"
+                           重复，故合并为一处。
+                        -->
+                        <controls:ConnectionIndicator Margin="16,0,0,0"
+                                                      VerticalAlignment="Center"
+                                                      IsConnected="{Binding IsAuthenticated, Mode=OneWay}"
+                                                      IsBusy="{Binding IsBusy, Mode=OneWay}"
+                                                      Text="{Binding StatusMessage, Mode=OneWay}" />
                     </StackPanel>
-                    <TextBlock Grid.Row="4" Margin="0,12,0,0" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding IsAuthenticated, StringFormat=登录状态：{0}}" />
                 </Grid>
             </ScrollViewer>
         </TabItem>

@@ -60,6 +60,18 @@
                       Color="#000000" />
 
     <!--
+        微组件尺寸与节奏（P61-03）。
+    -->
+    <sys:Double x:Key="SpinnerSize">16</sys:Double>
+    <sys:Double x:Key="SpinnerStrokeThickness">2</sys:Double>
+    <sys:Double x:Key="StateDotSize">8</sys:Double>
+    <sys:Double x:Key="StateDotActiveSize">10</sys:Double>
+    <!-- 旋转一圈的时长：比交互过渡慢，避免闪烁；900ms 接近常见的"进度环"节奏。 -->
+    <Duration x:Key="SpinDuration">0:0:0.9</Duration>
+    <!-- 状态点的呼吸周期。 -->
+    <Duration x:Key="PulseDuration">0:0:1.2</Duration>
+
+    <!--
         交互叠加色（P61-01）。借鉴 deepseek-harness 的做法：悬停/按下是**半透明叠加**
         而不是不透明换色。
 
@@ -414,15 +426,49 @@
                     <Setter Property="Template">
                         <Setter.Value>
                             <ControlTemplate TargetType="ComboBoxItem">
-                                <Border x:Name="ComboItemBorder"
-                                        Padding="{TemplateBinding Padding}"
-                                        Background="Transparent"
-                                        CornerRadius="{DynamicResource RadiusSm}">
-                                    <ContentPresenter VerticalAlignment="Center" />
-                                </Border>
+                                <Grid>
+                                    <Border x:Name="ComboItemBorder"
+                                            Padding="{TemplateBinding Padding}"
+                                            Background="Transparent"
+                                            CornerRadius="{DynamicResource RadiusSm}">
+                                        <ContentPresenter VerticalAlignment="Center" />
+                                    </Border>
+                                    <Border x:Name="ComboItemTint"
+                                            Background="{DynamicResource InteractionHoverBrush}"
+                                            CornerRadius="{DynamicResource RadiusSm}"
+                                            IsHitTestVisible="False"
+                                            Opacity="0" />
+                                </Grid>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="ComboItemBorder" Property="Background" Value="{DynamicResource HoverBrush}" />
+                                        <Trigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="ComboItemTint"
+                                                                     Storyboard.TargetProperty="Opacity"
+                                                                     To="1"
+                                                                     Duration="0:0:0.12">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <CubicEase EasingMode="EaseInOut" />
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.EnterActions>
+                                        <Trigger.ExitActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetName="ComboItemTint"
+                                                                     Storyboard.TargetProperty="Opacity"
+                                                                     To="0"
+                                                                     Duration="0:0:0.12">
+                                                        <DoubleAnimation.EasingFunction>
+                                                            <CubicEase EasingMode="EaseInOut" />
+                                                        </DoubleAnimation.EasingFunction>
+                                                    </DoubleAnimation>
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </Trigger.ExitActions>
                                     </Trigger>
                                     <Trigger Property="IsSelected" Value="True">
                                         <Setter TargetName="ComboItemBorder" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
@@ -798,18 +844,52 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TabItem">
-                    <Border x:Name="TabBorder"
-                            Padding="{TemplateBinding Padding}"
-                            Background="Transparent"
-                            BorderBrush="Transparent"
-                            BorderThickness="0,0,0,2">
-                        <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"
-                                          ContentSource="Header" />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="TabBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="0,0,0,2">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              ContentSource="Header" />
+                        </Border>
+                        <Border x:Name="TabTint"
+                                Background="{DynamicResource InteractionHoverBrush}"
+                                CornerRadius="{DynamicResource RadiusSm}"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="TabTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="TabTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
@@ -952,17 +1032,51 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
-                    <Border x:Name="ToggleBorder"
-                            Padding="{TemplateBinding Padding}"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{DynamicResource RadiusLg}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Border x:Name="ToggleBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{DynamicResource RadiusSm}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border x:Name="ToggleTint"
+                                Background="{DynamicResource InteractionHoverBrush}"
+                                CornerRadius="{DynamicResource RadiusSm}"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ToggleBorder" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ToggleTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ToggleTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="ToggleBorder" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
@@ -1134,30 +1248,64 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
-                    <Border x:Name="MenuItemBorder"
-                            Background="{TemplateBinding Background}"
-                            Padding="{TemplateBinding Padding}"
-                            CornerRadius="{DynamicResource RadiusSm}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <ContentPresenter Grid.Column="0"
-                                              VerticalAlignment="Center"
-                                              ContentSource="Header"
-                                              RecognizesAccessKey="True" />
-                            <TextBlock Grid.Column="1"
-                                       VerticalAlignment="Center"
-                                       Margin="12,0,0,0"
-                                       Text="{TemplateBinding InputGestureText}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       FontSize="12" />
-                        </Grid>
-                    </Border>
+                    <Grid>
+                        <Border x:Name="MenuItemBorder"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                CornerRadius="{DynamicResource RadiusSm}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter Grid.Column="0"
+                                                  VerticalAlignment="Center"
+                                                  ContentSource="Header"
+                                                  RecognizesAccessKey="True" />
+                                <TextBlock Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           Margin="12,0,0,0"
+                                           Text="{TemplateBinding InputGestureText}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="12" />
+                            </Grid>
+                        </Border>
+                        <Border x:Name="MenuItemTint"
+                                Background="{DynamicResource InteractionHoverBrush}"
+                                CornerRadius="{DynamicResource RadiusSm}"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
-                            <Setter TargetName="MenuItemBorder" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="MenuItemTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="MenuItemTint"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0"
+                                                         Duration="0:0:0.12">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseInOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.5" />
@@ -1329,10 +1477,11 @@
                                       FocusVisualStyle="{x:Null}">
                             <ToggleButton.Template>
                                 <ControlTemplate TargetType="ToggleButton">
-                                    <Border x:Name="HeaderBorder"
-                                            Background="Transparent"
-                                            Padding="12,0"
-                                            MinHeight="36">
+                                    <Grid>
+                                        <Border x:Name="HeaderBorder"
+                                                Background="Transparent"
+                                                Padding="12,0"
+                                                MinHeight="36">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
@@ -1354,10 +1503,43 @@
                                                               ContentSource="Content"
                                                               TextBlock.FontSize="14" />
                                         </Grid>
-                                    </Border>
+                                        </Border>
+                                        <Border x:Name="HeaderTint"
+                                                Background="{DynamicResource InteractionHoverBrush}"
+                                                CornerRadius="{DynamicResource RadiusSm}"
+                                                IsHitTestVisible="False"
+                                                Opacity="0" />
+                                    </Grid>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="HeaderBorder" Property="Background" Value="{DynamicResource HoverBrush}" />
+                                            <Trigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="HeaderTint"
+                                                                         Storyboard.TargetProperty="Opacity"
+                                                                         To="1"
+                                                                         Duration="0:0:0.12">
+                                                            <DoubleAnimation.EasingFunction>
+                                                                <CubicEase EasingMode="EaseInOut" />
+                                                            </DoubleAnimation.EasingFunction>
+                                                        </DoubleAnimation>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.EnterActions>
+                                            <Trigger.ExitActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="HeaderTint"
+                                                                         Storyboard.TargetProperty="Opacity"
+                                                                         To="0"
+                                                                         Duration="0:0:0.12">
+                                                            <DoubleAnimation.EasingFunction>
+                                                                <CubicEase EasingMode="EaseInOut" />
+                                                            </DoubleAnimation.EasingFunction>
+                                                        </DoubleAnimation>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.ExitActions>
                                         </Trigger>
                                         <Trigger Property="IsChecked" Value="True">
                                             <Setter TargetName="Arrow" Property="Data" Value="M 0,2 L 4,6 L 8,2" />

@@ -1,0 +1,27 @@
+<UserControl x:Class="CcCalendar.Desktop.Controls.StateDot"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             IsHitTestVisible="False"
+             Focusable="False"
+             Width="{DynamicResource StateDotSize}"
+             Height="{DynamicResource StateDotSize}">
+    <!--
+        P61-03 状态点。内圈常亮表示状态色，外圈在 IsPulsing 时呼吸（缩放 + 淡出），
+        用来表达"进行中"而不是静态色块。
+
+        画刷在代码里为每个实例单独创建（见 StateDot.xaml.cs）：
+        状态点需要按状态改色，共享画刷会让一个实例的改动影响所有实例。
+    -->
+    <Grid RenderTransformOrigin="0.5,0.5">
+        <Ellipse x:Name="Halo"
+                 Opacity="0"
+                 RenderTransformOrigin="0.5,0.5">
+            <Ellipse.RenderTransform>
+                <ScaleTransform x:Name="HaloScale" ScaleX="1" ScaleY="1" />
+            </Ellipse.RenderTransform>
+        </Ellipse>
+        <Ellipse x:Name="Core"
+                 Width="{DynamicResource StateDotSize}"
+                 Height="{DynamicResource StateDotSize}" />
+    </Grid>
+</UserControl>

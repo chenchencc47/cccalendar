@@ -1,0 +1,21 @@
+<UserControl x:Class="CcCalendar.Desktop.Controls.ConnectionIndicator"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:CcCalendar.Desktop.Controls"
+             Focusable="False">
+    <!--
+        P61-03 连接状态指示器。把"团队连接"这种持续状态从纯文字升级为
+        「状态点 + 文案」：已连接为绿色静点、连接中为强调色呼吸点、未连接为灰色静点。
+
+        状态点的颜色通过 StateBrushKey 传**令牌名**，因此深浅主题各自解析，
+        不需要为两套主题各写一份触发器。
+    -->
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <controls:StateDot x:Name="Dot"
+                           Margin="0,0,8,0"
+                           VerticalAlignment="Center" />
+        <TextBlock x:Name="Label"
+                   VerticalAlignment="Center"
+                   TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>
