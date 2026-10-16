@@ -24,6 +24,9 @@ if not exist "%CCCALENDAR_ISCC%" (
 "%CCCALENDAR_ISCC%" installer\cccalendar.iss
 if errorlevel 1 goto :failure
 
+rem Keep only the newest 3 installers locally (older ones are archived on GitHub Releases).
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File eng\prune-installers.ps1
+
 popd
 exit /b 0
 
