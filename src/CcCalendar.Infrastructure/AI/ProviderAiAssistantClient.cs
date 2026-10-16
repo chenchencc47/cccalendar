@@ -14,7 +14,6 @@ namespace CcCalendar.Infrastructure.AI;
 
 public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
 {
-    private const int MaximumToolRounds = 4;
     private readonly Func<AiProviderSettings> getSettings;
     private readonly HttpClient httpClient;
     private readonly SqliteReadOnlyAiToolExecutor toolExecutor;
@@ -22,19 +21,60 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
     private readonly TimeProvider timeProvider;
     private readonly ReadOnlyAiToolCatalog toolCatalog = new();
     private readonly WriteAiToolCatalog writeToolCatalog = new();
+    // P71-01：本地代理档的工具目录；getLocalAgentSettings 为 null 即未接线。
+    private readonly LocalAgentAiToolCatalog localToolCatalog = new();
+    private readonly Func<LocalAgentSettings>? getLocalAgentSettings;
 
     public ProviderAiAssistantClient(
         HttpClient httpClient,
         Func<AiProviderSettings> getSettings,
         ISecretStore secretStore,
         SqliteReadOnlyAiToolExecutor toolExecutor,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        Func<LocalAgentSettings>? getLocalAgentSettings = null)
     {
         this.httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         this.getSettings = getSettings ?? throw new ArgumentNullException(nameof(getSettings));
         this.secretStore = secretStore ?? throw new ArgumentNullException(nameof(secretStore));
         this.toolExecutor = toolExecutor ?? throw new ArgumentNullException(nameof(toolExecutor));
         this.timeProvider = timeProvider ?? TimeProvider.System;
+        this.getLocalAgentSettings = getLocalAgentSettings;
+    }
+
+    /// <summary>
+    /// 按权限档解析本轮工具目录（P71-01）：ReadOnly=只读查询；Write=查询+提案；
+    /// LocalAgent=查询+提案+本地工具（需设置 Enabled 且按各工具开关过滤）。
+    /// P71-03：LocalAgent 且 subagentDepth 未达上限时追加 spawn_subagent——
+    /// 达到上限的子会话不可再委派（第二道防线在 ExecuteSubagentAsync 深度守卫）。
+    /// </summary>
+    private IReadOnlyList<AiToolDefinition> ResolveTools(AiAssistantMode mode, int subagentDepth = 0)
+    {
+        if (mode == AiAssistantMode.LocalAgent)
+        {
+            LocalAgentSettings localSettings = getLocalAgentSettings?.Invoke()
+                ?? throw new InvalidOperationException("本地代理未启用。");
+            if (!localSettings.Enabled)
+            {
+                throw new InvalidOperationException("本地代理未在设置中启用，请先到设置 → AI 模型 → 本地代理开启。");
+            }
+
+            List<AiToolDefinition> tools =
+            [
+                .. toolCatalog.Definitions,
+                .. writeToolCatalog.Definitions,
+                .. localToolCatalog.GetAllowedTools(localSettings),
+            ];
+            if (subagentDepth < LocalAgentAiToolCatalog.MaximumSubagentDepth)
+            {
+                tools.Add(LocalAgentAiToolCatalog.SpawnSubagentTool);
+            }
+
+            return tools;
+        }
+
+        return mode == AiAssistantMode.Write
+            ? [.. toolCatalog.Definitions, .. writeToolCatalog.Definitions]
+            : toolCatalog.Definitions;
     }
 
     public async Task<AiAssistantResult> SendAsync(
@@ -57,9 +97,7 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
             throw new InvalidOperationException("请先在设置中保存 API Key。");
         }
 
-        IReadOnlyList<AiToolDefinition> tools = request.Mode == AiAssistantMode.Write
-            ? [.. toolCatalog.Definitions, .. writeToolCatalog.Definitions]
-            : toolCatalog.Definitions;
+        IReadOnlyList<AiToolDefinition> tools = ResolveTools(request.Mode, request.SubagentDepth);
         AiRequestContext context = MinimalAiContextBuilder.Build(
             request.UserMessage,
             tools,
@@ -70,11 +108,11 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
         string text = settings.Provider switch
         {
             AiProviderKind.OpenAiResponses => await SendResponsesAsync(
-                settings, endpoint, apiKey!, context, request.Mode, proposals, cancellationToken),
+                settings, endpoint, apiKey!, context, request, proposals, cancellationToken),
             AiProviderKind.Anthropic => await SendAnthropicAsync(
-                settings, endpoint, apiKey!, context, request.Mode, proposals, cancellationToken),
+                settings, endpoint, apiKey!, context, request, proposals, cancellationToken),
             AiProviderKind.OpenAiCompatible or AiProviderKind.Ollama => await SendChatAsync(
-                settings, endpoint, apiKey, context, request.Mode, proposals, cancellationToken),
+                settings, endpoint, apiKey, context, request, proposals, cancellationToken),
             _ => throw new InvalidOperationException("不支持的 AI 提供商。"),
         };
         return new AiAssistantResult(text, proposals);
@@ -95,7 +133,7 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
         Uri endpoint,
         string? apiKey,
         AiRequestContext context,
-        AiAssistantMode mode,
+        AiAssistantRequest request,
         List<AiAssistantProposal> proposals,
         CancellationToken cancellationToken)
     {
@@ -107,7 +145,9 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
         messages.Add(CreateMessage("user", context.UserMessage));
         JsonArray tools = CreateChatTools(context.Tools);
 
-        for (int round = 0; round < MaximumToolRounds; round++)
+        // P72（用户裁决）：不设工具轮次上限，由模型自行收敛；
+        // 失控风险由调用方取消（停止按钮 → cancellationToken）兜底。
+        for (int round = 0; ; round++)
         {
             var body = new JsonObject
             {
@@ -136,13 +176,11 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
             messages.Add(message.DeepClone());
             foreach (ToolCall toolCall in toolCalls)
             {
-                string result = await ExecuteToolAsync(
-                    toolCall, mode, proposals, cancellationToken);
+                string result = await ExecuteApprovedToolAsync(
+                    toolCall, request, proposals, cancellationToken);
                 messages.Add(CreateChatToolMessage(settings.Provider, toolCall, result));
             }
         }
-
-        throw new InvalidOperationException("模型工具调用次数超过限制。");
     }
 
     /// <summary>
@@ -193,7 +231,7 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
         Uri endpoint,
         string apiKey,
         AiRequestContext context,
-        AiAssistantMode mode,
+        AiAssistantRequest request,
         List<AiAssistantProposal> proposals,
         CancellationToken cancellationToken)
     {
@@ -201,7 +239,7 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
         JsonArray tools = CreateOpenAiTools(context.Tools);
         string? previousResponseId = null;
 
-        for (int round = 0; round < MaximumToolRounds; round++)
+        for (int round = 0; ; round++)
         {
             var body = new JsonObject
             {
@@ -228,8 +266,8 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
             input = [];
             foreach (ToolCall toolCall in toolCalls)
             {
-                string result = await ExecuteToolAsync(
-                    toolCall, mode, proposals, cancellationToken);
+                string result = await ExecuteApprovedToolAsync(
+                    toolCall, request, proposals, cancellationToken);
                 input.Add(new JsonObject
                 {
                     ["type"] = "function_call_output",
@@ -238,8 +276,6 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
                 });
             }
         }
-
-        throw new InvalidOperationException("模型工具调用次数超过限制。");
     }
 
     private async Task<string> SendAnthropicAsync(
@@ -247,7 +283,7 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
         Uri endpoint,
         string apiKey,
         AiRequestContext context,
-        AiAssistantMode mode,
+        AiAssistantRequest request,
         List<AiAssistantProposal> proposals,
         CancellationToken cancellationToken)
     {
@@ -256,7 +292,7 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
         messages.Add(CreateMessage("user", context.UserMessage));
         JsonArray tools = CreateAnthropicTools(context.Tools);
 
-        for (int round = 0; round < MaximumToolRounds; round++)
+        for (int round = 0; ; round++)
         {
             var body = new JsonObject
             {
@@ -284,8 +320,8 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
             var toolResults = new JsonArray();
             foreach (ToolCall toolCall in toolCalls)
             {
-                string result = await ExecuteToolAsync(
-                    toolCall, mode, proposals, cancellationToken);
+                string result = await ExecuteApprovedToolAsync(
+                    toolCall, request, proposals, cancellationToken);
                 toolResults.Add(new JsonObject
                 {
                     ["type"] = "tool_result",
@@ -296,8 +332,6 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
 
             messages.Add(new JsonObject { ["role"] = "user", ["content"] = toolResults });
         }
-
-        throw new InvalidOperationException("模型工具调用次数超过限制。");
     }
 
     private async Task<JsonObject> PostAsync(
@@ -362,12 +396,164 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
             : trimmed.Length > 500 ? trimmed[..500] : trimmed;
     }
 
-    private async Task<string> ExecuteToolAsync(
+    // P71-02：审批等待的默认超时——用户离开时不能让请求无限期挂起，超时默认拒绝。
+    private static readonly TimeSpan DefaultToolApprovalTimeout = TimeSpan.FromMinutes(2);
+
+    /// <summary>工具是否命中"总是允许"白名单（P71-02）：命中则不弹审批直接执行。</summary>
+    private bool IsToolAlwaysAllowed(string toolName)
+    {
+        return getLocalAgentSettings?.Invoke()?.AlwaysAllowTools.Contains(toolName) == true;
+    }
+
+    /// <summary>用户拒绝时的工具结果（P71-02）：返回 error JSON 让模型自纠，不抛异常。</summary>
+    private static string ToolDeniedResult(string toolName)
+    {
+        return "{\"error\":\"用户已拒绝执行工具 " + toolName + "，请勿重试同一调用\"}";
+    }
+
+    /// <summary>
+    /// 等待宿主 UI 的审批裁决（P71-02）：未接线回调时安全默认拒绝；超时默认拒绝；
+    /// 外层取消（用户停止）原样上抛保持既有取消语义。
+    /// </summary>
+    private static async Task<AiToolApprovalDecision> RequestToolApprovalAsync(
+        AiAssistantRequest request,
+        string toolName,
+        CancellationToken cancellationToken)
+    {
+        if (request.ToolApproval is null)
+        {
+            return AiToolApprovalDecision.Deny;
+        }
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(request.ApprovalTimeout ?? DefaultToolApprovalTimeout);
+        try
+        {
+            return await request
+                .ToolApproval(new AiToolApprovalRequest(toolName), timeout.Token)
+                .WaitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // 超时（或回调自身取消）：默认拒绝。
+            return AiToolApprovalDecision.Deny;
+        }
+    }
+
+    /// <summary>
+    /// 非流式路径的工具执行包装（P71-02）：需审批工具先裁决，拒绝返回 error JSON。
+    /// 流式路径在 ExecuteStreamingToolAsync 内联同一逻辑（要多发 PendingApproval 事件）。
+    /// P71-03：非流式路径没有 onUpdate，子代理事件丢弃、只返回答案文本。
+    /// </summary>
+    private async Task<string> ExecuteApprovedToolAsync(
         ToolCall toolCall,
-        AiAssistantMode mode,
+        AiAssistantRequest request,
         List<AiAssistantProposal> proposals,
         CancellationToken cancellationToken)
     {
+        if (request.Mode == AiAssistantMode.LocalAgent
+            && LocalAgentAiToolCatalog.RequiresApproval(toolCall.Name)
+            && !IsToolAlwaysAllowed(toolCall.Name)
+            && await RequestToolApprovalAsync(request, toolCall.Name, cancellationToken)
+                == AiToolApprovalDecision.Deny)
+        {
+            return ToolDeniedResult(toolCall.Name);
+        }
+
+        return await ExecuteToolAsync(
+            toolCall, request, proposals, onUpdate: null, cancellationToken);
+    }
+
+    /// <summary>
+    /// P71-03：执行 spawn_subagent——同 provider/model 开子会话（SubagentDepth+1、
+    /// 透传审批回调），子会话的流式事件经包装委托转发到宿主（onUpdate 为 null 的
+    /// 非流式路径丢弃事件只返回答案）。返回子代理最终答复文本作为工具结果。
+    /// </summary>
+    private async Task<string> ExecuteSubagentAsync(
+        ToolCall toolCall,
+        AiAssistantRequest request,
+        Func<AiAssistantUpdate, CancellationToken, Task>? onUpdate,
+        CancellationToken cancellationToken)
+    {
+        string description = GetOptionalString(toolCall.Arguments, "description") ?? "子代理";
+        string task = GetRequiredString(toolCall.Arguments, "task");
+        if (request.SubagentDepth >= LocalAgentAiToolCatalog.MaximumSubagentDepth)
+        {
+            // 深度守卫：目录层已达上限不再注入 spawn，这里兜底模型幻觉调用。
+            return "{\"error\":\"子代理嵌套已达上限 2 层，不可再委派\"}";
+        }
+
+        Guid subagentId = Guid.NewGuid();
+        Task Emit(AiAssistantUpdate update, CancellationToken token) =>
+            onUpdate?.Invoke(new AiSubagentUpdate(subagentId, description, update), token)
+                ?? Task.CompletedTask;
+        await Emit(AiSubagentStarted.Instance, cancellationToken);
+        var answer = new StringBuilder();
+        try
+        {
+            var subRequest = new AiAssistantRequest(task, request.Mode, toolApproval: request.ToolApproval)
+            {
+                SubagentDepth = request.SubagentDepth + 1,
+                ApprovalTimeout = request.ApprovalTimeout,
+            };
+            await StreamAsync(
+                subRequest,
+                (update, token) =>
+                {
+                    if (update is AiTextDelta { Text.Length: > 0 } delta)
+                    {
+                        answer.Append(delta.Text);
+                    }
+
+                    return Emit(update, token);
+                },
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // 取消：不发终态事件，卡片由宿主流结束兜底收束（与工具行取消语义一致）。
+            throw;
+        }
+        catch (Exception exception)
+        {
+            await Emit(new AiSubagentCompleted(false, exception.Message), cancellationToken);
+            throw;
+        }
+
+        await Emit(new AiSubagentCompleted(true, null), cancellationToken);
+        return answer.Length == 0 ? "（子代理未返回内容）" : answer.ToString();
+    }
+
+    private async Task<string> ExecuteToolAsync(
+        ToolCall toolCall,
+        AiAssistantRequest request,
+        List<AiAssistantProposal> proposals,
+        Func<AiAssistantUpdate, CancellationToken, Task>? onUpdate,
+        CancellationToken cancellationToken)
+    {
+        // P71-03：子代理委派最先分流——子会话事件经 onUpdate 包装转发，不发工具行
+        // 事件（UI 中子代理是折叠卡而非工具行）；委派本身不写入，不走审批。
+        if (toolCall.Name == LocalAgentAiToolCatalog.SpawnSubagentToolName)
+        {
+            return await ExecuteSubagentAsync(toolCall, request, onUpdate, cancellationToken);
+        }
+
+        // P71-01：本地工具分流到 LocalAgentToolExecutor（静态执行器）。getLocalAgentSettings
+        // 为 null 说明宿主没有接线，模型不可能拿到这些工具名，此时显式报错而非静默。
+        if (LocalAgentAiToolCatalog.IsLocalTool(toolCall.Name))
+        {
+            if (getLocalAgentSettings is null)
+            {
+                throw new InvalidOperationException("本地代理未启用。");
+            }
+
+            AiToolExecutionResult localResult = await LocalAgentToolExecutor.ExecuteAsync(
+                toolCall.Name,
+                toolCall.Arguments,
+                cancellationToken);
+            return localResult.Json;
+        }
+
         if (!toolCall.Name.StartsWith("propose_", StringComparison.Ordinal))
         {
             AiToolExecutionResult result = await toolExecutor.ExecuteAsync(
@@ -377,7 +563,7 @@ public sealed partial class ProviderAiAssistantClient : IAiAssistantClient
             return result.Json;
         }
 
-        if (mode != AiAssistantMode.Write)
+        if (request.Mode is not (AiAssistantMode.Write or AiAssistantMode.LocalAgent))
         {
             throw new InvalidOperationException("只读模式不允许写入提案工具。");
         }

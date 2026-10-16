@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Media;
 
 namespace CcCalendar.Desktop.Tests.Views;
 
@@ -34,13 +35,14 @@ public sealed class ThemeTokenContractTests
         "SpacingXl",
     ];
 
-    /// <summary>圆角令牌（P61-03 放开 8px 上限后：控件 10 / 卡片 12 / 浮层 16）。</summary>
+    /// <summary>圆角令牌（P61-03：控件 10 / 卡片 12 / 浮层 16；P70-01 新增聊天气泡 22，上限放开到 24）。</summary>
     private static readonly string[] RadiusTokens =
     [
         "RadiusSm",
         "RadiusMd",
         "RadiusLg",
         "RadiusXl",
+        "RadiusBubble",
     ];
 
     /// <summary>字号令牌，UI_DESIGN §2.1。</summary>
@@ -85,6 +87,7 @@ public sealed class ThemeTokenContractTests
         "OverlayScrimBrush",
         "ElevationPanelBrush",
         "ElevationProminentBrush",
+        "BubbleBrush",
     ];
 
     [Fact]
@@ -173,6 +176,34 @@ public sealed class ThemeTokenContractTests
         });
     }
 
+    /// <summary>
+    /// P70-01 聊天气泡令牌契约：助理消息列表从评论区形态改为聊天客户端形态，
+    /// 用户消息是右对齐气泡（deepseek-harness 形态）。
+    /// BubbleBrush 浅/深主题都要声明且是 SolidColorBrush（深色下气泡仍是可分辨的抬高面）；
+    /// RadiusBubble 必须是 CornerRadius 且值为 22（与 harness 气泡圆角一致）。
+    /// </summary>
+    [Fact]
+    public void BubbleTokensMatchTheChatClientSpec()
+    {
+        RunOnThemeThread((light, dark) =>
+        {
+            Assert.True(
+                light["BubbleBrush"] is SolidColorBrush,
+                "BubbleBrush 未在 Theme.xaml（浅色基准）中声明，或不是 SolidColorBrush。");
+            Assert.True(
+                dark["BubbleBrush"] is SolidColorBrush,
+                "BubbleBrush 未在 DarkTheme.xaml 中覆写，或不是 SolidColorBrush。");
+
+            Assert.True(
+                light["RadiusBubble"] is CornerRadius,
+                "RadiusBubble 未在 Theme.xaml 中声明，或不是 CornerRadius"
+                    + "（P60-02 教训：sys:Double 圆角令牌会在 Arrange 阶段抛 InvalidCastException）。");
+            Assert.Equal(
+                new CornerRadius(22d),
+                (CornerRadius)light["RadiusBubble"]!);
+        });
+    }
+
     [Fact]
     public void RadiusTokensStayWithinTheDocumentedCeiling()
     {
@@ -189,11 +220,12 @@ public sealed class ThemeTokenContractTests
                     Math.Max(radius.TopLeft, radius.TopRight),
                     Math.Max(radius.BottomLeft, radius.BottomRight));
 
-                // P61-03：用户裁决放开原先的 8px 上限，改为 16（浮层档）。
-                // 上限仍要存在，避免后续随手写出 24/28 这类超出刻度的值。
+                // P61-03 放开原先的 8px 上限到 16；P70-01（Q1 裁决）再次放开到 24：
+                // 聊天气泡 22 超出原刻度，但属于 harness 既定形态，专用不外溢。
+                // 上限仍要存在，避免后续随手写出 28/32 这类超出刻度的值。
                 Assert.True(
-                    maximum <= 16d,
-                    $"圆角令牌 '{key}' = {maximum}，超出既定的 16px 上限（UI_DESIGN §2.2）。");
+                    maximum <= 24d,
+                    $"圆角令牌 '{key}' = {maximum}，超出既定的 24px 上限（P70-01 Q1 裁决放开）。");
             }
         });
     }

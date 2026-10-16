@@ -28,7 +28,8 @@ public sealed class AppearanceSettingsViewModel : ObservableObject
         Action<bool>? startWithMainWindowHiddenChanged = null,
         ThemePreference appTheme = ThemePreference.System,
         Action<ThemePreference>? appThemeChanged = null,
-        TeamConnectionViewModel? teamConnection = null)
+        TeamConnectionViewModel? teamConnection = null,
+        LocalAgentSettingsViewModel? localAgent = null)
     {
         state = new DesktopAppearanceSettingsState(workbench, calendar, agenda, todo);
         this.apply = apply ?? ((_, _) => { });
@@ -48,6 +49,7 @@ public sealed class AppearanceSettingsViewModel : ObservableObject
         ReminderNotifications = reminderNotifications;
         Ai = ai;
         TeamConnection = teamConnection;
+        LocalAgent = localAgent;
         RestoreDefaultsCommand = new RelayCommand(RestoreDefaults);
     }
 
@@ -62,6 +64,9 @@ public sealed class AppearanceSettingsViewModel : ObservableObject
     public AiSettingsViewModel? Ai { get; }
 
     public TeamConnectionViewModel? TeamConnection { get; }
+
+    /// <summary>设置页"AI 模型 → 本地代理"区（P71-01），null = 未接线（测试宿主）。</summary>
+    public LocalAgentSettingsViewModel? LocalAgent { get; }
 
     public bool StartWithMainWindowHidden
     {

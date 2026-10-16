@@ -5,6 +5,7 @@
                 xmlns:controls="clr-namespace:CcCalendar.Desktop.Controls"
              xmlns:desktop="clr-namespace:CcCalendar.Desktop.Desktop"
              xmlns:iconPacks="http://metro.mahapps.com/winfx/xaml/iconpacks"
+             xmlns:vm="clr-namespace:CcCalendar.Desktop.ViewModels"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              d:DesignHeight="680"
@@ -432,6 +433,8 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="20" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="20" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <TextBlock Style="{StaticResource PageTitleStyle}" Text="AI 模型" />
                 <StackPanel Grid.Row="2">
@@ -511,6 +514,19 @@
                             <TextBox Grid.Column="1" Height="32" VerticalContentAlignment="Center" Text="{Binding Model, UpdateSourceTrigger=PropertyChanged}" />
                         </Grid>
                     </Border>
+                    <!-- P74-01：上下文窗口元数据，供助理页上下文计量条计算占用百分比；留空表示未设置。 -->
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <Grid MinHeight="52">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center" Text="上下文窗口（tokens）" />
+                            <TextBox Grid.Column="1"
+                                     Height="32"
+                                     AutomationProperties.Name="上下文窗口 tokens"
+                                     VerticalContentAlignment="Center"
+                                     Text="{Binding ContextWindowTokensText, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="模型上下文窗口大小（tokens），用于助理页上下文占用显示；留空表示未设置" />
+                        </Grid>
+                    </Border>
                     <Border BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="0,1,0,1"
                             Visibility="{Binding RequiresApiKey, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -567,12 +583,111 @@
                             </ListBox>
                         </Grid>
                     </Border>
+                    <!-- P74-04：视觉桥——图片附件发送前经此模型转写为文字注入对话；选择即生效。 -->
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                        <Grid MinHeight="52">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
+                            <TextBlock VerticalAlignment="Center"
+                                       Text="视觉转写模型"
+                                       ToolTip="给助理页附加的图片选择一个视觉模型：发送前先把图片转写为文字再交给主模型分析；选“不启用”则不能附加图片" />
+                            <ComboBox Grid.Column="1"
+                                      Height="32"
+                                      VerticalContentAlignment="Center"
+                                      AutomationProperties.Name="视觉转写模型"
+                                      DisplayMemberPath="DisplayName"
+                                      ItemsSource="{Binding VisualBridgeOptions}"
+                                      SelectedValue="{Binding VisualBridgeModelId, Mode=TwoWay}"
+                                      SelectedValuePath="Id" />
+                        </Grid>
+                    </Border>
                 </StackPanel>
                 <StackPanel Grid.Row="4" Orientation="Horizontal">
                     <Button MinWidth="96" Command="{Binding SaveCommand}" Content="保存设置" Style="{StaticResource PrimaryButtonStyle}" />
                     <Button MinWidth="96" Margin="8,0,0,0" Command="{Binding TestConnectionCommand}" Content="测试连接" />
                     <TextBlock Margin="16,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding ConnectionStatus}" />
                 </StackPanel>
+                <!--
+                    P71-01：本地代理白名单元。Content 为 null（未接线）时整区不渲染。
+                    总开关默认关（Q6 裁决）；只读三件套默认允许，写入两件套默认关，
+                    开启后每次调用仍需在助理页逐次审批（P71-02）。
+                -->
+                <ContentControl Grid.Row="6"
+                                Content="{Binding DataContext.LocalAgent, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                    <ContentControl.ContentTemplate>
+                        <DataTemplate DataType="{x:Type vm:LocalAgentSettingsViewModel}">
+                            <StackPanel>
+                                <TextBlock Margin="0,0,0,4" FontSize="16" FontWeight="SemiBold" Text="本地代理" />
+                                <TextBlock Margin="0,0,0,10"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Text="开启后助理页权限档会出现“本地代理”（可访问本机文件与执行命令）。只读工具默认允许；写入类工具即使开启，每次调用仍需在助理页确认。" />
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                                    <Grid MinHeight="48">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center" Text="启用本地代理" />
+                                        <CheckBox Grid.Column="1"
+                                                  AutomationProperties.Name="启用本地代理"
+                                                  IsChecked="{Binding Enabled, Mode=TwoWay}" />
+                                    </Grid>
+                                </Border>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                                    <Grid MinHeight="48">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center" Text="read_file · 读取文件" />
+                                        <CheckBox Grid.Column="1" AutomationProperties.Name="允许读取文件" IsChecked="{Binding AllowReadFile, Mode=TwoWay}" />
+                                    </Grid>
+                                </Border>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                                    <Grid MinHeight="48">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center" Text="list_directory · 列出目录" />
+                                        <CheckBox Grid.Column="1" AutomationProperties.Name="允许列出目录" IsChecked="{Binding AllowListDirectory, Mode=TwoWay}" />
+                                    </Grid>
+                                </Border>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                                    <Grid MinHeight="48">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center" Text="search_files · 搜索文件" />
+                                        <CheckBox Grid.Column="1" AutomationProperties.Name="允许搜索文件" IsChecked="{Binding AllowSearchFiles, Mode=TwoWay}" />
+                                    </Grid>
+                                </Border>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                                    <Grid MinHeight="48">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center" Text="write_file · 写入文件（需审批）" />
+                                        <CheckBox Grid.Column="1" AutomationProperties.Name="允许写入文件" IsChecked="{Binding AllowWriteFile, Mode=TwoWay}" />
+                                    </Grid>
+                                </Border>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                                    <Grid MinHeight="48">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center" Text="run_command · 执行命令（需审批）" />
+                                        <CheckBox Grid.Column="1" AutomationProperties.Name="允许执行命令" IsChecked="{Binding AllowRunCommand, Mode=TwoWay}" />
+                                    </Grid>
+                                </Border>
+                                <!-- P71-02：审批"总是允许"白名单的展示与整体清除。 -->
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,1">
+                                    <Grid MinHeight="48">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="总是允许的工具" />
+                                            <TextBlock FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Text="{Binding AlwaysAllowToolsSummary}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1"
+                                                Width="76"
+                                                HorizontalAlignment="Left"
+                                                AutomationProperties.Name="清除总是允许"
+                                                Command="{Binding ClearAlwaysAllowToolsCommand}"
+                                                Content="清除"
+                                                Visibility="{Binding HasAlwaysAllowTools, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ContentControl.ContentTemplate>
+                </ContentControl>
             </Grid>
         </TabItem>
         <TabItem Header="团队连接">

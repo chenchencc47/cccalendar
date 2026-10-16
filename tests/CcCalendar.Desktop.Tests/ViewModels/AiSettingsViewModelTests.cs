@@ -40,6 +40,111 @@ public sealed class AiSettingsViewModelTests
     }
 
     [Fact]
+    public async Task SavePersistsContextWindowTokensAndSelectionRestoresIt()
+    {
+        var deepseek = new AiModelConfiguration(
+            "deepseek",
+            "DeepSeek",
+            new AiProviderSettings { Model = "deepseek-v4-flash" },
+            ContextWindowTokens: 131072);
+        var other = new AiModelConfiguration(
+            "other",
+            "Other",
+            new AiProviderSettings { Model = "other-model" });
+        var catalog = new AiModelCatalog(
+            [other, deepseek],
+            other.Id,
+            other.Settings);
+        var viewModel = new AiSettingsViewModel(
+            catalog,
+            new MemorySecretStore(),
+            new RecordingConnectionTester(),
+            (_, _, _) => Task.CompletedTask);
+
+        // 选中带元数据的配置，表单恢复上下文窗口。
+        viewModel.SelectedConfiguration = deepseek;
+        Assert.Equal("131072", viewModel.ContextWindowTokensText);
+
+        // 修改并保存，目录与持久化回调拿到新值。
+        viewModel.ContextWindowTokensText = "65536";
+        await viewModel.SaveAsync(CancellationToken.None);
+        AiModelConfiguration saved = viewModel.ConfiguredModels.Single(
+            model => model.Id == "deepseek");
+        Assert.Equal(65536, saved.ContextWindowTokens);
+
+        // 清空 = 未设置（null），不写 0。
+        viewModel.ContextWindowTokensText = string.Empty;
+        await viewModel.SaveAsync(CancellationToken.None);
+        Assert.Null(viewModel.ConfiguredModels
+            .Single(model => model.Id == "deepseek").ContextWindowTokens);
+    }
+
+    [Fact]
+    public async Task SaveRejectsInvalidContextWindowInput()
+    {
+        var catalog = new AiModelCatalog([], null, new AiProviderSettings());
+        IReadOnlyList<AiModelConfiguration>? savedModels = null;
+        var viewModel = new AiSettingsViewModel(
+            catalog,
+            new MemorySecretStore(),
+            new RecordingConnectionTester(),
+            (models, _, _) =>
+            {
+                savedModels = models;
+                return Task.CompletedTask;
+            })
+        {
+            DisplayName = "DeepSeek",
+            Endpoint = "https://example.test/v1",
+            Model = "deepseek-v4-flash",
+            ContextWindowTokensText = "不是数字",
+        };
+
+        await viewModel.SaveAsync(CancellationToken.None);
+
+        Assert.Contains("上下文窗口", viewModel.ConnectionStatus);
+        Assert.Null(savedModels);
+    }
+
+    [Fact]
+    public void VisualBridgeSelectionPersistsImmediatelyWithDisableSentinel()
+    {
+        var deepseek = new AiModelConfiguration(
+            "deepseek",
+            "DeepSeek",
+            new AiProviderSettings { Model = "deepseek-v4-flash" });
+        var vision = new AiModelConfiguration(
+            "vision",
+            "千问视觉",
+            new AiProviderSettings { Model = "qwen-vl-max" });
+        var catalog = new AiModelCatalog(
+            [deepseek, vision],
+            deepseek.Id,
+            deepseek.Settings);
+        string? persistedId = null;
+        var viewModel = new AiSettingsViewModel(
+            catalog,
+            new MemorySecretStore(),
+            new RecordingConnectionTester(),
+            (_, _, _) => Task.CompletedTask,
+            visualBridgeModelId: null,
+            visualBridgeChanged: value => persistedId = value);
+
+        // 选项集：哨兵「不启用」打头 + 全部已配置模型。
+        Assert.Equal(
+            ["不启用", "DeepSeek", "千问视觉"],
+            [.. viewModel.VisualBridgeOptions.Select(option => option.DisplayName)]);
+
+        // 选择即持久化（无需点保存）。
+        viewModel.VisualBridgeModelId = "vision";
+        Assert.Equal("vision", persistedId);
+
+        // 选回哨兵（Id 为空串）持久化为 null（未启用）。
+        viewModel.VisualBridgeModelId = "";
+        Assert.Null(persistedId);
+    }
+
+    [Fact]
     public void SelectingConfiguredModelChangesProviderUsedByConversation()
     {
         var first = new AiModelConfiguration(

@@ -18,6 +18,15 @@ public sealed record AppSettings
 
     public bool ShowDesktopTodo { get; init; }
 
+    // P70-06a：助理页左侧会话栏收起状态（序列化为 assistantSessionsCollapsed）。
+    public bool AssistantSessionsCollapsed { get; init; }
+
+    // P70-06b：主界面左侧导航栏收起状态（序列化为 mainNavCollapsed），false=展开 200px，true=rail 48px。
+    public bool MainNavCollapsed { get; init; }
+
+    // P70-06b：主界面顶部搜索栏收起状态（序列化为 topSearchCollapsed），收起后原位只留搜索图标按钮。
+    public bool TopSearchCollapsed { get; init; }
+
     public DesktopCalendarLayoutSettings DesktopWorkbenchCalendar { get; init; } = new()
     {
         MonthWidth = 1000,
@@ -56,9 +65,15 @@ public sealed record AppSettings
 
     public AiProviderSettings AiProvider { get; init; } = new();
 
+    // P71-01：AI 助手"本地代理"档设置（序列化为 localAgent），默认关。
+    public LocalAgentSettings LocalAgent { get; init; } = new();
+
     public IReadOnlyList<AiModelConfiguration> AiModels { get; init; } = [];
 
     public string? SelectedAiModelId { get; init; }
+
+    // P74-04：视觉桥（图片附件 → 视觉模型转写）使用的模型 Id；null = 未启用。
+    public string? VisualBridgeModelId { get; init; }
 
     public WellnessReminderSettings WellnessReminders { get; init; } = new();
 

@@ -45,6 +45,7 @@ public partial class App : Application, IDisposable
     private GlobalHotkeyManager? hotkeyManager;
     private HttpClient? weatherHttpClient;
     private HttpClient? aiHttpClient;
+    private HttpClient? visionHttpClient;
     private HttpClient? oidcHttpClient;
     private ReminderBackgroundScheduler? reminderScheduler;
     private ReminderNotificationHost? reminderNotificationHost;
@@ -158,6 +159,9 @@ public partial class App : Application, IDisposable
             settings.ReminderNotifications,
             updated => settings = settings with { ReminderNotifications = updated });
         aiHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+        // P74-04：视觉桥独立客户端——大图 base64 + 视觉模型转写耗时高于普通
+        // 聊天轮次，不受 aiHttpClient 20s 约束。
+        visionHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         var secretStore = new WindowsCredentialSecretStore();
         IReadOnlyList<AiModelConfiguration> configuredModels = settings.AiModels.Count > 0
             ? settings.AiModels
@@ -187,7 +191,14 @@ public partial class App : Application, IDisposable
             modelCatalog,
             secretStore,
             new AiConnectionTester(aiHttpClient),
-            SaveAiModelConfigurationsAsync);
+            SaveAiModelConfigurationsAsync,
+            settings.VisualBridgeModelId,
+            value =>
+            {
+                // P74-04：视觉桥选择即时持久化（选择即生效，无需点保存）。
+                settings = settings with { VisualBridgeModelId = value };
+                SaveAppSettings();
+            });
         await aiSettings.LoadSecretStatusAsync(CancellationToken.None);
         oidcHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
         var oidcLoginClient = new OidcLoginClient(
@@ -216,7 +227,17 @@ public partial class App : Application, IDisposable
             aiHttpClient,
             () => modelCatalog.CurrentSettings,
             secretStore,
-            new SqliteReadOnlyAiToolExecutor(ApplicationPaths.DatabasePath));
+            new SqliteReadOnlyAiToolExecutor(ApplicationPaths.DatabasePath),
+            getLocalAgentSettings: () => settings.LocalAgent);
+        // P71-01：本地代理白名单元——开关即时写回设置并通知助理页刷新第三档可见性。
+        var localAgentSettings = new LocalAgentSettingsViewModel(
+            settings.LocalAgent,
+            updated =>
+            {
+                settings = settings with { LocalAgent = updated };
+                SaveAppSettings();
+                mainWindow?.RefreshAssistantLocalAgentState();
+            });
         var appearanceSettings = new AppearanceSettingsViewModel(
             settings.DesktopWorkbenchAppearance,
             settings.DesktopCalendarAppearance,
@@ -230,7 +251,8 @@ public partial class App : Application, IDisposable
             updated => settings = settings with { StartWithMainWindowHidden = updated },
             settings.Theme,
             ApplyThemeFromSettings,
-            teamConnection);
+            teamConnection,
+            localAgentSettings);
         var wellnessScheduler = new WellnessReminderScheduler(TimeProvider.System.GetLocalNow());
         mainWindow = new MainWindow(
             appearanceSettings,
@@ -244,7 +266,33 @@ public partial class App : Application, IDisposable
             ReloadDesktopWindowsAsync,
             LoadTeamRoomBoardAsync,
             SubmitTeamBookingAsync,
-            DeleteRemoteBookingAsync);
+            DeleteRemoteBookingAsync,
+            settings.AssistantSessionsCollapsed,
+            updated => settings = settings with { AssistantSessionsCollapsed = updated },
+            settings.MainNavCollapsed,
+            updated => settings = settings with { MainNavCollapsed = updated },
+            settings.TopSearchCollapsed,
+            updated => settings = settings with { TopSearchCollapsed = updated },
+            () => settings.LocalAgent.Enabled,
+            tool =>
+            {
+                // P71-02：审批行"总是允许"——并入白名单（去重）后保存并刷新设置页快照。
+                if (settings.LocalAgent.AlwaysAllowTools.Contains(tool, StringComparer.Ordinal))
+                {
+                    return;
+                }
+
+                LocalAgentSettings updated = settings.LocalAgent with
+                {
+                    AlwaysAllowTools = [.. settings.LocalAgent.AlwaysAllowTools, tool],
+                };
+                settings = settings with { LocalAgent = updated };
+                SaveAppSettings();
+                localAgentSettings.Refresh(updated);
+            },
+            // P74-04：视觉桥——图片附件经视觉模型转写后注入出站消息。
+            new ProviderVisionTranscriber(visionHttpClient, secretStore),
+            () => settings.VisualBridgeModelId);
         teamConnection.ConnectionChanged += (_, _) =>
         {
             _ = mainWindow.RefreshOpenRoomBoardAsync();
@@ -478,6 +526,8 @@ public partial class App : Application, IDisposable
         weatherHttpClient = null;
         aiHttpClient?.Dispose();
         aiHttpClient = null;
+        visionHttpClient?.Dispose();
+        visionHttpClient = null;
         oidcHttpClient?.Dispose();
         oidcHttpClient = null;
         roomBookingHttpClient?.Dispose();

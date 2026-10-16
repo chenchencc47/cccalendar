@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="CcCalendar.Desktop.Views.AssistantView"
+<UserControl x:Class="CcCalendar.Desktop.Views.AssistantView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ai="clr-namespace:CcCalendar.Core.AI;assembly=CcCalendar.Core"
@@ -9,7 +9,939 @@
              d:DesignHeight="680"
              d:DesignWidth="960"
              mc:Ignorable="d">
-    <Grid Margin="24,20,24,24">
+    <!--
+        P70-06a 会话条目样式：基于主导航 NavigationItemStyle（3px 标记条 +
+        AccentSubtle 选中底 + hover 动画全部继承），只覆盖两行条目需要的
+        高度/内边距，并把自动化名从主导航的 Label 换成会话标题。
+    -->
+    <UserControl.Resources>
+        <!--
+            P70-07：附件文件卡的 KB meta（"12.3 KB"）与发送/停止单按钮的
+            反向可见性（非流式=发送图标）。两个转换器只服务本视图，注册在
+            视图资源里而不进 App.xaml——作用域收敛，其他页面不感知。
+        -->
+        <local:FileSizeTextConverter x:Key="FileSizeTextConverter" />
+        <local:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
+        <Style x:Key="AssistantSessionItemStyle"
+               TargetType="ListBoxItem"
+               BasedOn="{StaticResource NavigationItemStyle}">
+            <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
+            <Setter Property="Height" Value="Auto" />
+            <Setter Property="MinHeight" Value="48" />
+            <Setter Property="Padding" Value="12,8" />
+        </Style>
+        <!--
+            P71-03：消息模板提取为命名资源——子代理折叠卡的卡内 ItemsControl 用
+            同一模板递归渲染 SubagentMessages（嵌套子代理卡即 lineage 树）；
+            模板自引用必须走 DynamicResource（StaticResource 不可自指）。
+        -->
+        <DataTemplate x:Key="AssistantMessageTemplate">
+            <!-- P70-01：消息分隔由底部分隔线改为纯上下留白（评论区形态 → 聊天客户端形态）。
+                 P72（用户裁决）：消息区与输入卡均全幅铺开，不套 harness 的居中
+                 宽度轴；用户气泡贴齐列表右缘，上限 = 列表宽 × 0.7。 -->
+            <Border x:Name="MessageRoot"
+                    Padding="0,12">
+                <Grid>
+                    <!--
+                        用户消息（P70-01）：右对齐气泡，无头像无名称行，贴齐列表右缘。
+                        MaxWidth = 列表宽 × 0.7（源绑 ListBox.ActualWidth，独立布局
+                        输出）。禁止绑 MessageRoot 的 ActualWidth/MaxWidth——根宽
+                        取决于子内容，循环依赖会把气泡卡死在 0 宽（P72 事故）。
+                    -->
+                    <Border Padding="16,10"
+                            HorizontalAlignment="Right"
+                            Background="{DynamicResource BubbleBrush}"
+                            CornerRadius="{StaticResource RadiusBubble}"
+                            MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource ScaleClampConverter}, ConverterParameter='0.7'}">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsUser}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <!-- MinHeight=0 覆盖隐式样式的 36：气泡靠内边距（上下10）贴合内容，
+                             否则单行气泡会被撑到 56px 高，与 harness 形态不符。 -->
+                        <TextBox MinHeight="0"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 FontSize="{DynamicResource UiBodyFontSize}"
+                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                 IsReadOnly="True"
+                                 IsTabStop="False"
+                                 Padding="0"
+                                 Text="{Binding Text, Mode=OneWay}"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Disabled" />
+                    </Border>
+                    <!-- 助手消息（P70-01）：无头像无名称行，全宽无边框直接渲染。 -->
+                    <Grid>
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsUser}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                    <!-- P70-05：工具行独占第三个分支，助手正文区让位。 -->
+                                    <DataTrigger Binding="{Binding IsToolCall}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                    <!-- P70-07：错误行独占第四个分支，助手正文区同样让位。 -->
+                                    <DataTrigger Binding="{Binding IsError}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                    <!-- P71-03：子代理卡独占第五个分支，助手正文区同样让位
+                                         （卡头复用消息模板的 Usage 小计，正文区不再重复渲染）。 -->
+                                    <DataTrigger Binding="{Binding IsSubagent}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <!--
+                            P70-02 思考折叠行（ReasoningRow，语义移植自 deepseek-harness）：
+                            收起态一行 = 灯泡 + 标题 + Chevron，整行可点击；替换原先
+                            Expander + SubtleSurface 背景块的笨重形态。
+                        -->
+                        <StackPanel Grid.Row="0"
+                                    Margin="0,0,0,8"
+                                    Visibility="{Binding HasThinking, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <ToggleButton x:Name="ReasoningRowToggle"
+                                          AutomationProperties.Name="思考过程"
+                                          Cursor="Hand"
+                                          ToolTip="展开或收起思考过程">
+                                <ToggleButton.Template>
+                                    <!--
+                                        透明模板：去掉按钮底/边框/内边距，行只承担点击语义
+                                        （与主题 ComboBox 的下拉 Toggle 同一套去铬做法）。
+                                        行内容与触发器必须放进 ControlTemplate：模板触发器才允许
+                                        Storyboard.TargetName（Style 触发器会报 MC4011）。
+                                    -->
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent" Padding="0">
+                                            <StackPanel Orientation="Horizontal">
+                                                <iconPacks:PackIconLucide Width="14"
+                                                                          Height="14"
+                                                                          VerticalAlignment="Center"
+                                                                          Kind="Lightbulb"
+                                                                          Foreground="{DynamicResource TextSecondaryBrush}" />
+                                                <!--
+                                                    标题 shimmer（移植 CSS background-position 扫光的做法）：
+                                                    遮罩静态为「全黑 + 一个停在文字右侧的透明-黑-透明亮带」，
+                                                    静止时文字区间全黑=完全可见；流式时只动画画刷的
+                                                    RelativeTransform（TranslateTransform.X），让亮带从左向右
+                                                    反复扫过（带右侧的文字被遮住，形成渐显波）；
+                                                    停止时 X 还原为 0，亮带回停到文字右侧、标题恢复全显。
+                                                -->
+                                                <TextBlock Margin="6,0,0,0"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="{DynamicResource FontCompactSize}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Text="{Binding ThinkingTitle}">
+                                                    <TextBlock.OpacityMask>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                            <LinearGradientBrush.RelativeTransform>
+                                                                <TranslateTransform x:Name="ThinkingShimmerTranslate" X="0" />
+                                                            </LinearGradientBrush.RelativeTransform>
+                                                            <GradientStop Offset="1.2" Color="Black" />
+                                                            <GradientStop Offset="1.25" Color="Transparent" />
+                                                            <GradientStop Offset="1.35" Color="Black" />
+                                                            <GradientStop Offset="1.4" Color="Transparent" />
+                                                        </LinearGradientBrush>
+                                                    </TextBlock.OpacityMask>
+                                                </TextBlock>
+                                                <!-- Chevron：展开时旋转 180°，时长/缓动用现有 Motion 令牌。 -->
+                                                <iconPacks:PackIconLucide x:Name="ReasoningChevron"
+                                                                          Width="14"
+                                                                          Height="14"
+                                                                          Margin="6,0,0,0"
+                                                                          VerticalAlignment="Center"
+                                                                          Kind="ChevronDown"
+                                                                          Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                          RenderTransformOrigin="0.5,0.5">
+                                                    <iconPacks:PackIconLucide.RenderTransform>
+                                                        <RotateTransform Angle="0" />
+                                                    </iconPacks:PackIconLucide.RenderTransform>
+                                                </iconPacks:PackIconLucide>
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding IsReasoningStreaming}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard x:Name="ThinkingShimmer">
+                                                        <Storyboard>
+                                                            <!-- 亮带从文字左侧外滑到右侧外，1.6s 循环。 -->
+                                                            <DoubleAnimation Storyboard.TargetName="ThinkingShimmerTranslate"
+                                                                             Storyboard.TargetProperty="X"
+                                                                             From="-2.8" To="0"
+                                                                             Duration="0:0:1.6"
+                                                                             RepeatBehavior="Forever" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <StopStoryboard BeginStoryboardName="ThinkingShimmer" />
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Trigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="ReasoningChevron"
+                                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                             To="180"
+                                                                             Duration="{StaticResource MotionBase}">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <CubicEase EasingMode="EaseInOut" />
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.EnterActions>
+                                                <Trigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="ReasoningChevron"
+                                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                             To="0"
+                                                                             Duration="{StaticResource MotionBase}">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <CubicEase EasingMode="EaseInOut" />
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.ExitActions>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <!-- 展开态：缩进的次级文字块（13px 次级字号令牌），随折叠行开合。 -->
+                            <TextBlock Margin="20,6,0,2"
+                                       FontSize="{DynamicResource FontCompactSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Text="{Binding ThinkingText}"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding IsChecked, ElementName=ReasoningRowToggle, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </StackPanel>
+                        <TextBox Grid.Row="1"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                 IsReadOnly="True"
+                                 IsTabStop="False"
+                                 Padding="0"
+                                 Text="{Binding Text, Mode=OneWay}"
+                                 TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Disabled">
+                            <TextBox.Style>
+                                <Style TargetType="TextBox">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMarkdown}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBox.Style>
+                        </TextBox>
+                        <local:AssistantMarkdownViewer Grid.Row="1"
+                                                       Background="Transparent"
+                                                       BorderThickness="0"
+                                                       HorizontalScrollBarVisibility="Disabled"
+                                                       IsToolBarVisible="False"
+                                                       Markdown="{Binding Text}"
+                                                       Padding="0"
+                                                       VerticalScrollBarVisibility="Disabled">
+                            <local:AssistantMarkdownViewer.Style>
+                                <Style TargetType="local:AssistantMarkdownViewer">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMarkdown}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </local:AssistantMarkdownViewer.Style>
+                        </local:AssistantMarkdownViewer>
+                        <!--
+                            P70-04：助手消息尾部操作行 = 轮次用量胶囊 + 复制按钮。
+                            用量胶囊只在收到 usage 后出现（用户消息/历史恢复消息没有 usage），
+                            Popup 的 PlacementTarget 在 code-behind 挂到按钮上——DataTemplate 内
+                            用 ElementName 绑兄弟 Popup 的解析时机不可靠（模板 NameScope）。
+                        -->
+                        <StackPanel Grid.Row="2"
+                                    Margin="0,8,0,0"
+                                    HorizontalAlignment="Left"
+                                    Orientation="Horizontal">
+                            <Button Height="20"
+                                    Padding="10,0"
+                                    AutomationProperties.Name="轮次用量"
+                                    Click="MessageUsagePillClick"
+                                    Style="{StaticResource StatPillButtonStyle}"
+                                    ToolTip="本轮 token 用量"
+                                    Visibility="{Binding HasUsage, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <iconPacks:PackIconLucide Width="12"
+                                                              Height="12"
+                                                              VerticalAlignment="Center"
+                                                              Kind="Coins" />
+                                    <TextBlock Margin="6,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               Text="{Binding UsageSummary}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Width="26"
+                                    Height="26"
+                                    Margin="8,0,0,0"
+                                    Padding="0"
+                                    AutomationProperties.Name="复制消息"
+                                    Click="CopyMessageClick"
+                                    CommandParameter="{Binding Text}"
+                                    Style="{StaticResource IconButtonStyle}"
+                                    ToolTip="复制消息">
+                                <iconPacks:PackIconLucide Width="14" Height="14" Kind="Copy" />
+                            </Button>
+                            <Popup x:Name="MessageUsagePopup"
+                                   AllowsTransparency="True"
+                                   Placement="Top"
+                                   StaysOpen="False">
+                                <Border MinWidth="220"
+                                        Padding="12"
+                                        Background="{DynamicResource SurfaceBrush}"
+                                        BorderBrush="{DynamicResource HairlineBrush}"
+                                        BorderThickness="0.5"
+                                        CornerRadius="{DynamicResource RadiusXl}"
+                                        Effect="{DynamicResource ElevationProminentEffect}">
+                                    <ItemsControl ItemsSource="{Binding UsageDetail}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <DockPanel MinHeight="24" Margin="0,1">
+                                                    <TextBlock DockPanel.Dock="Left"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               Text="{Binding Label}" />
+                                                    <TextBlock DockPanel.Dock="Right"
+                                                               FontFamily="Cascadia Mono, Microsoft YaHei UI"
+                                                               Text="{Binding Value}" />
+                                                </DockPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Border>
+                            </Popup>
+                        </StackPanel>
+                    </Grid>
+                    <!--
+                        P70-05 工具调用行（ToolRow，语义移植自 deepseek-harness）：
+                        一行式折叠行 = 8px 状态点 + 工具中文名 + 参数摘要 + Chevron。
+                        状态点：Running=主题色呼吸（Opacity 脉冲）、Ok=SuccessBrush、
+                        Error=DangerBrush；展开区是缩进的等宽文本块（参数+结果）。
+                        工具行不持久化，历史恢复的消息不会走到这个分支。
+                    -->
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsToolCall}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <ToggleButton x:Name="ToolRowToggle"
+                                      AutomationProperties.Name="{Binding ToolDisplayName}"
+                                      Cursor="Hand"
+                                      ToolTip="展开或收起工具调用详情">
+                            <ToggleButton.Template>
+                                <!-- 透明模板与 ReasoningRow 同一做法：行只承担点击语义，
+                                     触发器/动画必须放 ControlTemplate.Triggers（MC4011）。 -->
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border Background="Transparent" Padding="0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse x:Name="ToolStateDot"
+                                                     Width="8"
+                                                     Height="8"
+                                                     VerticalAlignment="Center"
+                                                     Fill="{DynamicResource AccentBrush}" />
+                                            <TextBlock Margin="8,0,0,0"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="{DynamicResource FontCompactSize}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       Text="{Binding ToolDisplayName}" />
+                                            <TextBlock Margin="8,0,0,0"
+                                                       MaxWidth="360"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="{DynamicResource FontCompactSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Text="{Binding ToolSummary}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <iconPacks:PackIconLucide x:Name="ToolChevron"
+                                                                      Width="14"
+                                                                      Height="14"
+                                                                      Margin="6,0,0,0"
+                                                                      VerticalAlignment="Center"
+                                                                      Kind="ChevronDown"
+                                                                      Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                      RenderTransformOrigin="0.5,0.5">
+                                                <iconPacks:PackIconLucide.RenderTransform>
+                                                    <RotateTransform Angle="0" />
+                                                </iconPacks:PackIconLucide.RenderTransform>
+                                            </iconPacks:PackIconLucide>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <!-- Running：状态点呼吸（Opacity 脉冲），终态时 ExitActions 停止。 -->
+                                        <DataTrigger Binding="{Binding ToolState}" Value="Running">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="ToolRunningPulse">
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="ToolStateDot"
+                                                                         Storyboard.TargetProperty="Opacity"
+                                                                         From="1"
+                                                                         To="0.25"
+                                                                         Duration="0:0:0.9"
+                                                                         AutoReverse="True"
+                                                                         RepeatBehavior="Forever" />
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="ToolRunningPulse" />
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding ToolState}" Value="Ok">
+                                            <Setter TargetName="ToolStateDot" Property="Fill" Value="{DynamicResource SuccessBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding ToolState}" Value="Error">
+                                            <Setter TargetName="ToolStateDot" Property="Fill" Value="{DynamicResource DangerBrush}" />
+                                        </DataTrigger>
+                                        <!-- P71-02：待审批用警示色静止点，与 Running 呼吸点区分。 -->
+                                        <DataTrigger Binding="{Binding ToolState}" Value="PendingApproval">
+                                            <Setter TargetName="ToolStateDot" Property="Fill" Value="{DynamicResource WarningBrush}" />
+                                        </DataTrigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Trigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="ToolChevron"
+                                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                         To="180"
+                                                                         Duration="{StaticResource MotionBase}">
+                                                            <DoubleAnimation.EasingFunction>
+                                                                <CubicEase EasingMode="EaseInOut" />
+                                                            </DoubleAnimation.EasingFunction>
+                                                        </DoubleAnimation>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.EnterActions>
+                                            <Trigger.ExitActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="ToolChevron"
+                                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                         To="0"
+                                                                         Duration="{StaticResource MotionBase}">
+                                                            <DoubleAnimation.EasingFunction>
+                                                                <CubicEase EasingMode="EaseInOut" />
+                                                            </DoubleAnimation.EasingFunction>
+                                                        </DoubleAnimation>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.ExitActions>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <!--
+                            P71-02：审批按钮组（Q4 裁决四档全部可选）。仅 PendingApproval 行
+                            可见；命令挂在 AssistantViewModel（行只是 CommandParameter），
+                            经 FindAncestor 定位 MessageList 的 DataContext 解析。
+                        -->
+                        <StackPanel Margin="12,0,0,0" VerticalAlignment="Center" Orientation="Horizontal">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ToolState}" Value="PendingApproval">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <Button MinWidth="64"
+                                    Padding="10,3"
+                                    AutomationProperties.Name="允许一次"
+                                    Command="{Binding Path=DataContext.AllowToolOnceCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                    CommandParameter="{Binding}"
+                                    Content="允许一次" />
+                            <Button MinWidth="88"
+                                    Margin="6,0,0,0"
+                                    Padding="10,3"
+                                    AutomationProperties.Name="本次会话允许"
+                                    Command="{Binding Path=DataContext.AllowToolForSessionCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                    CommandParameter="{Binding}"
+                                    Content="本次会话允许" />
+                            <Button MinWidth="76"
+                                    Margin="6,0,0,0"
+                                    Padding="10,3"
+                                    AutomationProperties.Name="总是允许"
+                                    Command="{Binding Path=DataContext.AlwaysAllowToolCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                    CommandParameter="{Binding}"
+                                    Content="总是允许" />
+                            <Button MinWidth="56"
+                                    Margin="6,0,0,0"
+                                    Padding="10,3"
+                                    AutomationProperties.Name="拒绝"
+                                    Command="{Binding Path=DataContext.DenyToolCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                    CommandParameter="{Binding}"
+                                    Content="拒绝" />
+                        </StackPanel>
+                        <!-- 展开态：缩进的等宽文本块（参数+结果），SubtleSurface 底。 -->
+                        <Border Margin="20,6,0,2"
+                                Padding="8,6"
+                                Background="{DynamicResource SubtleSurfaceBrush}"
+                                CornerRadius="{StaticResource RadiusMd}"
+                                Visibility="{Binding IsChecked, ElementName=ToolRowToggle, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock FontFamily="Cascadia Mono, Microsoft YaHei UI"
+                                       FontSize="{DynamicResource FontCompactSize}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Text="{Binding ToolDetail}"
+                                       TextWrapping="Wrap" />
+                        </Border>
+                    </StackPanel>
+                    <!--
+                        P70-07 错误行（ErrorRow，语义移植 deepseek-harness）：发送失败
+                        插入消息流对应轮次尾部——8px 红点（DangerBrush）+ Danger 色
+                        600 标题 + secondary 消息 + 等宽错误码（异常类型，可空省略）。
+                        与工具行同一懒加载做法：内容放 ControlTemplate——普通消息的
+                        折叠分支只建壳不建内容，否则每条消息都会实例化一个红点
+                        Ellipse，污染视觉树断言（也是纯浪费）。
+                        错误行不持久化，历史恢复的消息不会走到这个分支。
+                    -->
+                    <ContentControl>
+                        <ContentControl.Style>
+                            <Style TargetType="ContentControl">
+                                <Setter Property="Focusable" Value="False" />
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ContentControl">
+                                            <DockPanel>
+                                                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                                                    <Ellipse Width="8"
+                                                             Height="8"
+                                                             VerticalAlignment="Center"
+                                                             Fill="{DynamicResource DangerBrush}" />
+                                                    <TextBlock Margin="8,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="{DynamicResource FontCompactSize}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource DangerBrush}"
+                                                               Text="{Binding ErrorTitle}" />
+                                                </StackPanel>
+                                                <TextBlock Margin="12,0,0,0"
+                                                           DockPanel.Dock="Right"
+                                                           VerticalAlignment="Center"
+                                                           FontFamily="Cascadia Mono, Microsoft YaHei UI"
+                                                           FontSize="{DynamicResource FontCompactSize}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Text="{Binding ErrorCode}"
+                                                           Visibility="{Binding HasErrorCode, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                                <TextBlock Margin="10,0,0,0"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="{DynamicResource FontCompactSize}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Text="{Binding ErrorMessage}"
+                                                           TextWrapping="Wrap" />
+                                            </DockPanel>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsError}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ContentControl.Style>
+                    </ContentControl>
+                    <!--
+                        P71-03 子代理折叠卡（SubagentCard）：spawn_subagent 的 UI 形态
+                        是卡片而非工具行——卡头一行 = 8px 状态点（Running 呼吸/Ok=Success/
+                        Error=Danger）+「子代理」标签 + 描述 + 状态文案 + token 小计 +
+                        时长 + Chevron；展开区 = 左侧 2px lineage 竖线 + 卡内消息流
+                        （本模板 DynamicResource 自引用递归渲染，嵌套子代理卡层层缩进）。
+                        spawn 本身不经审批；卡内写工具的审批按钮经 AncestorType=ListBox
+                        解析到主 MessageList 的 VM 命令（视觉树可达）。
+                    -->
+                    <StackPanel>
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSubagent}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+                        <ToggleButton Cursor="Hand"
+                                      AutomationProperties.Name="{Binding SubagentDescription}"
+                                      IsChecked="{Binding IsSubagentExpanded, Mode=TwoWay}"
+                                      ToolTip="展开或收起子代理消息">
+                            <ToggleButton.Template>
+                                <!-- 透明模板与 ToolRow 同一做法：行只承担点击语义，
+                                     触发器/动画必须放 ControlTemplate.Triggers（MC4011）。 -->
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border Background="Transparent" Padding="0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse x:Name="SubagentStateDot"
+                                                     Width="8"
+                                                     Height="8"
+                                                     VerticalAlignment="Center"
+                                                     Fill="{DynamicResource AccentBrush}" />
+                                            <TextBlock Margin="8,0,0,0"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="{DynamicResource FontCompactSize}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       Text="子代理" />
+                                            <TextBlock Margin="8,0,0,0"
+                                                       MaxWidth="280"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="{DynamicResource FontCompactSize}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       Text="{Binding SubagentDescription}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Margin="8,0,0,0"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="{DynamicResource FontCompactSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Text="{Binding SubagentStateText}" />
+                                            <!-- token 小计胶囊：与工具行展开区同一 SubtleSurface 形态。 -->
+                                            <Border Margin="8,0,0,0"
+                                                    Padding="8,1"
+                                                    VerticalAlignment="Center"
+                                                    Background="{DynamicResource SubtleSurfaceBrush}"
+                                                    CornerRadius="{StaticResource RadiusMd}"
+                                                    Visibility="{Binding HasUsage, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                <TextBlock FontSize="{DynamicResource FontCompactSize}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Text="{Binding UsageSummary}" />
+                                            </Border>
+                                            <!-- 时长只在终态有值（执行中为 null，呼吸点已表明在跑）。 -->
+                                            <TextBlock Margin="8,0,0,0"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="{DynamicResource FontCompactSize}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       Text="{Binding SubagentDurationText}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding SubagentDurationText}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <iconPacks:PackIconLucide x:Name="SubagentChevron"
+                                                                      Width="14"
+                                                                      Height="14"
+                                                                      Margin="6,0,0,0"
+                                                                      VerticalAlignment="Center"
+                                                                      Kind="ChevronDown"
+                                                                      Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                      RenderTransformOrigin="0.5,0.5">
+                                                <iconPacks:PackIconLucide.RenderTransform>
+                                                    <RotateTransform Angle="0" />
+                                                </iconPacks:PackIconLucide.RenderTransform>
+                                            </iconPacks:PackIconLucide>
+                                        </StackPanel>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <!-- Running：状态点呼吸（Opacity 脉冲），终态时 ExitActions 停止。 -->
+                                        <DataTrigger Binding="{Binding SubagentState}" Value="Running">
+                                            <DataTrigger.EnterActions>
+                                                <BeginStoryboard x:Name="SubagentRunningPulse">
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="SubagentStateDot"
+                                                                         Storyboard.TargetProperty="Opacity"
+                                                                         From="1"
+                                                                         To="0.25"
+                                                                         Duration="0:0:0.9"
+                                                                         AutoReverse="True"
+                                                                         RepeatBehavior="Forever" />
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </DataTrigger.EnterActions>
+                                            <DataTrigger.ExitActions>
+                                                <StopStoryboard BeginStoryboardName="SubagentRunningPulse" />
+                                            </DataTrigger.ExitActions>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding SubagentState}" Value="Ok">
+                                            <Setter TargetName="SubagentStateDot" Property="Fill" Value="{DynamicResource SuccessBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding SubagentState}" Value="Error">
+                                            <Setter TargetName="SubagentStateDot" Property="Fill" Value="{DynamicResource DangerBrush}" />
+                                        </DataTrigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Trigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="SubagentChevron"
+                                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                         To="180"
+                                                                         Duration="{StaticResource MotionBase}">
+                                                            <DoubleAnimation.EasingFunction>
+                                                                <CubicEase EasingMode="EaseInOut" />
+                                                            </DoubleAnimation.EasingFunction>
+                                                        </DoubleAnimation>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.EnterActions>
+                                            <Trigger.ExitActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="SubagentChevron"
+                                                                         Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                         To="0"
+                                                                         Duration="{StaticResource MotionBase}">
+                                                            <DoubleAnimation.EasingFunction>
+                                                                <CubicEase EasingMode="EaseInOut" />
+                                                            </DoubleAnimation.EasingFunction>
+                                                        </DoubleAnimation>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.ExitActions>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <!-- 失败原因：Completed(false) 的一句话错误，非失败不占位。 -->
+                        <TextBlock Margin="16,6,0,0"
+                                   FontSize="{DynamicResource FontCompactSize}"
+                                   Foreground="{DynamicResource DangerBrush}"
+                                   Text="{Binding SubagentError}"
+                                   TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SubagentError}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding SubagentError}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <!--
+                            展开区：左 2px 竖线 = lineage（子会话从父会话"生长"出来），
+                            卡内消息流复用本模板递归渲染（DynamicResource 自引用）。
+                        -->
+                        <Border Margin="6,6,0,2"
+                                BorderBrush="{DynamicResource HairlineBrush}"
+                                BorderThickness="2,0,0,0"
+                                Padding="10,0,0,0"
+                                Visibility="{Binding IsSubagentExpanded, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <ItemsControl ItemTemplate="{DynamicResource AssistantMessageTemplate}"
+                                          ItemsSource="{Binding SubagentMessages}" />
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+    <!--
+        P70-06a：根布局改两列——左列会话栏（展开 240 / 收起 rail 48，语义移植
+        deepseek-harness 侧边栏折叠交互），右列原聊天客户端内容不动。
+        列宽切换在 code-behind：ColumnDefinition.Width 不是可绑定属性，
+        DataTrigger 的 Setter 也无法跨模板命令列定义。
+    -->
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="SessionsPaneColumn" Width="240" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!--
+            P72 会话栏改版：展开态 = Surface 面板（标题行内联新对话加号 + 收起按钮，
+            单行会话条目行末标紧凑时间）；收起态 = 面板整体收掉，只留一枚展开按钮
+            （用户裁决：白色部分全部收起来，只留一个组件）。
+        -->
+        <!--
+            P73（用户反馈）：面板边距 24,20,0,24 → 0,0,0,24——左边贴住主导航
+            右缘、上边贴住顶栏下缘（两处缝隙都去掉），仅保留底部呼吸；
+            开合可见性与列宽补间全部由 code-behind 驱动（见 SetSessionsPaneState：
+            GridLengthAnimation 平滑过渡 240↔48，收起时面板淡出让位、展开时淡入）。
+        -->
+        <Border x:Name="SessionsPanel"
+                Margin="0,0,0,24"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,1,0">
+            <DockPanel Margin="10,12,10,12">
+                <!--
+                    标题行（P72）：新对话从占整列的大按钮收敛为标题右侧加号图标
+                    （harness ProjectRowItem 的 iconButton 形态）。
+                -->
+                <Grid DockPanel.Dock="Top">
+                    <TextBlock VerticalAlignment="Center" Style="{StaticResource SectionTitleStyle}" Text="会话" />
+                    <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                        <Button Width="26"
+                                Height="26"
+                                Padding="0"
+                                AutomationProperties.Name="新对话"
+                                Command="{Binding NewChatCommand}"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTip="开始新对话">
+                            <iconPacks:PackIconLucide Width="15" Height="15" Kind="MessageSquarePlus" />
+                        </Button>
+                        <Button Width="26"
+                                Height="26"
+                                Margin="4,0,0,0"
+                                Padding="0"
+                                AutomationProperties.Name="收起会话栏"
+                                Command="{Binding ToggleSessionsPaneCommand}"
+                                Style="{StaticResource IconButtonStyle}"
+                                ToolTip="收起会话栏">
+                            <iconPacks:PackIconLucide Width="15" Height="15" Kind="ChevronLeft" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+                <!-- 空态：还没有任何带消息的会话时给出引导。 -->
+                <StackPanel Margin="8,16,8,0"
+                            HorizontalAlignment="Center"
+                            DockPanel.Dock="Top">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasSessionHistory}" Value="False">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <TextBlock HorizontalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="暂无历史会话" />
+                    <TextBlock Margin="0,6,0,0"
+                               HorizontalAlignment="Center"
+                               FontSize="{DynamicResource FontCompactSize}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="点击右上「+」开始提问" />
+                </StackPanel>
+                <ListBox Background="Transparent"
+                         BorderThickness="0"
+                         ItemContainerStyle="{StaticResource AssistantSessionItemStyle}"
+                         ItemsSource="{Binding Sessions}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         SelectedItem="{Binding CurrentSession, Mode=TwoWay}"
+                         Style="{StaticResource NavigationListStyle}"
+                         ToolTip="会话列表">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <!--
+                                P72 单行条目（harness sessionRow 形态）：标题 ellipsis 占满，
+                                行末 12px 三级色紧凑时间徽标；悬停时时间让位删除按钮
+                                （harness 的 time ↔ rowActions 交换语义）。
+                            -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"
+                                           Text="{Binding Title}"
+                                           TextTrimming="CharacterEllipsis"
+                                           ToolTip="{Binding Title}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1"
+                                           Margin="6,0,0,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="{DynamicResource FontCaptionSize}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Text="{Binding RelativeTimeText}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding RelativeTimeText}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <!-- hover 删除：与时间徽标同列，悬停条目时出现。 -->
+                                <Button Grid.Column="1"
+                                        Width="24"
+                                        Height="24"
+                                        Padding="0"
+                                        VerticalAlignment="Center"
+                                        AutomationProperties.Name="删除会话"
+                                        Command="{Binding DataContext.DeleteChatCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip="删除会话">
+                                    <iconPacks:PackIconLucide Width="13" Height="13" Kind="Trash2" />
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+                                            <Setter Property="Opacity" Value="0" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                    <Setter Property="Opacity" Value="1" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+        <!--
+            P72 收起态：Surface 面板整体收起（无白色残留），只在原位留一枚
+            展开按钮。P73：可见性终态由 code-behind 的开合动画落定，这里只给
+            初始 Collapsed（attach 时 SetSessionsPaneState 会按 VM 状态纠正）。
+        -->
+        <Button x:Name="SessionsExpandButton"
+                Width="32"
+                Height="32"
+                Margin="8,12,0,0"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Padding="0"
+                AutomationProperties.Name="展开会话栏"
+                Command="{Binding ToggleSessionsPaneCommand}"
+                Style="{StaticResource IconButtonStyle}"
+                ToolTip="展开会话栏"
+                Visibility="Collapsed">
+            <iconPacks:PackIconLucide Width="15" Height="15" Kind="ChevronRight" />
+        </Button>
+
+        <Grid Grid.Column="1" Margin="24,20,24,24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="18" />
@@ -18,14 +950,16 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <!-- P72：统计胶囊行移出 composer 卡片，落在卡片下方居中（harness StatsPills 的 dock 位置）。 -->
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+        <!--
+            P70-07 顶栏收敛：模型选择器与权限档移入 composer 输入框上缘
+            （AssistantContextBar，见下方），顶部只留页面标题与命令按钮。
+        -->
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="36" />
-                <RowDefinition Height="10" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="10" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <TextBlock VerticalAlignment="Center" Style="{StaticResource PageTitleStyle}" Text="AI 助手" />
             <StackPanel x:Name="AssistantCommandBar"
@@ -36,63 +970,6 @@
                 <Button MinWidth="104" Margin="8,0,0,0" Padding="14,5" AutomationProperties.Name="撤销上次操作" Command="{Binding UndoCommand}" Content="撤销上次操作" />
                 <Button MinWidth="112" Margin="8,0,0,0" Padding="14,5" AutomationProperties.Name="重试上次请求" Command="{Binding RetryCommand}" Content="重试上次请求" />
             </StackPanel>
-            <Border x:Name="AssistantContextBar"
-                    Grid.Row="2"
-                    Padding="10,6"
-                    Background="{DynamicResource SubtleSurfaceBrush}"
-                    CornerRadius="4">
-                <DockPanel>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                        <TextBlock Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="权限" />
-                        <ToggleButton Content="只读"
-                                      IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static ai:AiAssistantMode.ReadOnly}}"
-                                      Style="{StaticResource SegmentToggleStyle}" />
-                        <ToggleButton Margin="4,0,0,0"
-                                      Content="写入（需确认）"
-                                      IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static ai:AiAssistantMode.Write}}"
-                                      Style="{StaticResource SegmentToggleStyle}" />
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}" Text="模型" />
-                        <ComboBox Width="190"
-                                  DisplayMemberPath="DisplayName"
-                                  ItemsSource="{Binding AvailableModels}"
-                                   SelectedItem="{Binding SelectedModel, Mode=TwoWay}" />
-                        <TextBlock Margin="14,0,0,0"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   Text="{Binding ProviderStatus}" />
-                        <TextBlock Margin="14,0,0,0"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"
-                                   Text="{Binding AttachmentStatus}" />
-                    </StackPanel>
-                </DockPanel>
-            </Border>
-            <StackPanel Grid.Row="4" Orientation="Horizontal">
-                <Button MinWidth="88"
-                        Padding="14,5"
-                        AutomationProperties.Name="新建对话"
-                        Command="{Binding NewChatCommand}"
-                        Content="新建对话" />
-                <Button MinWidth="72"
-                        Margin="8,0,0,0"
-                        Padding="14,5"
-                        AutomationProperties.Name="删除当前对话"
-                        Command="{Binding DeleteChatCommand}"
-                        Content="删除"
-                        ToolTip="删除当前对话" />
-                <TextBlock Margin="16,0,8,0"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           Text="会话" />
-                <ComboBox MinWidth="280"
-                          AutomationProperties.Name="历史会话"
-                          DisplayMemberPath="Title"
-                          ItemsSource="{Binding Sessions}"
-                          SelectedItem="{Binding CurrentSession, Mode=TwoWay}"
-                          ToolTip="切换历史对话" />
-            </StackPanel>
         </Grid>
         <ListBox x:Name="MessageList"
                  Grid.Row="2"
@@ -102,7 +979,8 @@
                  PreviewMouseWheel="MessageListPreviewMouseWheel"
                  ScrollViewer.CanContentScroll="False"
                  ScrollViewer.PanningMode="VerticalOnly"
-                 VirtualizingPanel.IsVirtualizing="False">
+                 VirtualizingPanel.IsVirtualizing="False"
+                 ItemTemplate="{DynamicResource AssistantMessageTemplate}">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Setter Property="Padding" Value="0" />
@@ -119,130 +997,6 @@
                     </Setter>
                 </Style>
             </ListBox.ItemContainerStyle>
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <Border Padding="0,12"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="0,0,0,1">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <StackPanel Grid.Row="0"
-                                        Margin="0,0,0,8"
-                                        Orientation="Horizontal">
-                                <Border Width="24"
-                                        Height="24"
-                                        Background="{DynamicResource AccentBrush}"
-                                        CornerRadius="12">
-                                    <TextBlock HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               FontSize="{DynamicResource FontCaptionSize}"
-                                               FontWeight="SemiBold"
-                                               Foreground="White">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Text" Value="AI" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsUser}" Value="True">
-                                                        <Setter Property="Text" Value="你" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </Border>
-                                <TextBlock Margin="8,0,0,0"
-                                           VerticalAlignment="Center"
-                                           FontSize="12"
-                                           FontWeight="SemiBold">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Text" Value="助理" />
-                                            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsUser}" Value="True">
-                                                    <Setter Property="Text" Value="你" />
-                                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </StackPanel>
-                            <Expander Grid.Row="1"
-                                      Margin="0,0,0,8"
-                                      Header="思考"
-                                      Visibility="{Binding HasThinking, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                <Border Padding="10,8"
-                                        Background="{DynamicResource SubtleSurfaceBrush}"
-                                        BorderBrush="{DynamicResource HairlineBrush}"
-                                        BorderThickness="0.5"
-                                        CornerRadius="6">
-                                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}"
-                                               Text="{Binding ThinkingText}"
-                                               TextWrapping="Wrap" />
-                                </Border>
-                            </Expander>
-                            <TextBox Grid.Row="2"
-                                     Background="Transparent"
-                                     BorderThickness="0"
-                                     Foreground="{DynamicResource TextPrimaryBrush}"
-                                     IsReadOnly="True"
-                                     IsTabStop="False"
-                                     Padding="0"
-                                     Text="{Binding Text, Mode=OneWay}"
-                                     TextWrapping="Wrap"
-                                     VerticalScrollBarVisibility="Disabled">
-                                <TextBox.Style>
-                                    <Style TargetType="TextBox">
-                                        <Setter Property="Visibility" Value="Visible" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsMarkdown}" Value="True">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBox.Style>
-                            </TextBox>
-                            <local:AssistantMarkdownViewer Grid.Row="2"
-                                                           Background="Transparent"
-                                                           BorderThickness="0"
-                                                           HorizontalScrollBarVisibility="Disabled"
-                                                           IsToolBarVisible="False"
-                                                           Markdown="{Binding Text}"
-                                                           Padding="0"
-                                                           VerticalScrollBarVisibility="Disabled">
-                                <local:AssistantMarkdownViewer.Style>
-                                    <Style TargetType="local:AssistantMarkdownViewer">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsMarkdown}" Value="True">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </local:AssistantMarkdownViewer.Style>
-                            </local:AssistantMarkdownViewer>
-                            <Button Grid.Row="3"
-                                    Width="26"
-                                    Height="26"
-                                    Margin="0,8,0,0"
-                                    Padding="0"
-                                    AutomationProperties.Name="复制消息"
-                                    HorizontalAlignment="Left"
-                                    Click="CopyMessageClick"
-                                    CommandParameter="{Binding Text}"
-                                    ToolTip="复制消息">
-                                <iconPacks:PackIconLucide Width="14" Height="14" Kind="Copy" />
-                            </Button>
-                        </Grid>
-                    </Border>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
         </ListBox>
         <Border Grid.Row="3"
                 Padding="16"
@@ -278,9 +1032,18 @@
                 </StackPanel>
             </Grid>
         </Border>
-        <Border Grid.Row="6"
+        <!--
+            P72 composer 重排（语义移植 deepseek-harness InputBar）：
+            卡片 = 附件行 → 输入区 → 工具行；工具行左侧 = 加号（功能菜单）+
+            权限下拉芯片，右侧 = 模型下拉芯片 + 34px 圆形发送/停止按钮。
+            模型/权限选择器从输入框上缘的 AssistantContextBar 收进本行；
+            统计胶囊行移出卡片，落在卡片下方居中。
+            P72（用户裁决）：输入卡全幅铺开，不套 harness 的居中宽度轴。
+        -->
+        <Border x:Name="ComposerPanel"
+                Grid.Row="6"
                 Margin="0,14,0,0"
-                Padding="10"
+                Padding="10,8"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource HairlineBrush}"
                 BorderThickness="0.5"
@@ -291,7 +1054,14 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="8" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
+                <!--
+                    P70-07 附件文件卡（harness 形态）：定宽 240、圆角 RadiusXl(16)、
+                    左 28px 文件图标 + 名称（14/500 单行省略）+ meta 12px 次级色
+                    （KB 大小）+ 常显移除小按钮（沿用原 chip 的常显交互）。
+                -->
                 <ItemsControl Margin="4,0,4,0"
                               ItemsSource="{Binding Attachments}"
                               Visibility="{Binding HasAttachments, Converter={StaticResource BooleanToVisibilityConverter}}">
@@ -300,52 +1070,58 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Margin="0,0,8,4"
-                                    Padding="8,4,4,4"
+                            <Border Width="240"
+                                    Margin="0,0,8,4"
+                                    Padding="10,8"
                                     Background="{DynamicResource PageBackgroundBrush}"
                                     BorderBrush="{DynamicResource HairlineBrush}"
                                     BorderThickness="0.5"
-                                    CornerRadius="4">
-                                <StackPanel Orientation="Horizontal">
-                                    <iconPacks:PackIconLucide Width="14" Height="14" VerticalAlignment="Center" Kind="FileText" />
-                                    <TextBlock Margin="6,0,4,0" VerticalAlignment="Center" Text="{Binding FileName}" />
-                                    <Button Width="24"
+                                    CornerRadius="{DynamicResource RadiusXl}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="28" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <iconPacks:PackIconLucide Width="28"
+                                                              Height="28"
+                                                              VerticalAlignment="Center"
+                                                              Kind="FileText"
+                                                              Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <TextBlock FontWeight="Medium"
+                                                   Text="{Binding FileName}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding FileName}" />
+                                        <TextBlock Margin="0,2,0,0"
+                                                   FontSize="{DynamicResource FontCaptionSize}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Text="{Binding SizeBytes, Converter={StaticResource FileSizeTextConverter}}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="3"
+                                            Width="24"
                                             Height="24"
+                                            Margin="4,0,0,0"
                                             Padding="0"
+                                            VerticalAlignment="Center"
                                             AutomationProperties.Name="移除附件"
                                             Command="{Binding DataContext.RemoveAttachmentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
                                             ToolTip="移除附件">
                                         <iconPacks:PackIconLucide Width="13" Height="13" Kind="X" />
                                     </Button>
-                                </StackPanel>
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="36" />
-                        <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="36" />
-                        <ColumnDefinition Width="8" />
-                        <ColumnDefinition Width="36" />
-                    </Grid.ColumnDefinitions>
-                    <Button Width="36"
-                            Height="36"
-                            Padding="0"
-                            AutomationProperties.Name="添加附件"
-                            Click="AttachFilesClick"
-                            ToolTip="添加附件">
-                        <iconPacks:PackIconLucide Width="16" Height="16" Kind="Paperclip" />
-                    </Button>
-                    <TextBox Grid.Column="2"
+                <!-- 输入区（P72）：无内嵌按钮的全宽多行文本框，工具行移到下方。 -->
+                <TextBox Grid.Row="2"
                          AutomationProperties.Name="AI 消息"
                          MinHeight="36"
                          MaxHeight="96"
-                         Padding="6"
+                         Padding="4,6"
                          AcceptsReturn="True"
                          Background="Transparent"
                          BorderThickness="0"
@@ -354,28 +1130,473 @@
                          TextWrapping="Wrap"
                          ToolTip="Enter 发送，Shift+Enter 换行"
                          VerticalScrollBarVisibility="Auto" />
-                    <Button Grid.Column="4"
-                        Width="36"
-                        Height="36"
-                        Padding="0"
-                        AutomationProperties.Name="发送"
-                        Command="{Binding SendCommand}"
-                        Style="{StaticResource PrimaryButtonStyle}"
-                        ToolTip="发送">
-                         <iconPacks:PackIconLucide Width="16" Height="16" Foreground="White" Kind="Send" />
-                     </Button>
-                    <Button Grid.Column="6"
-                            Width="36"
-                            Height="36"
-                            Padding="0"
-                            AutomationProperties.Name="停止请求"
-                            Command="{Binding StopCommand}"
-                            ToolTip="停止请求">
-                        <iconPacks:PackIconLucide Width="16" Height="16" Kind="Square" />
-                    </Button>
-                </Grid>
+                <!--
+                    工具行（P72，harness .row 形态）：左 = 28px 圆形加号（功能菜单：
+                    当前只有添加附件）+ 权限下拉芯片；右 = 模型下拉芯片 + 发送按钮。
+                -->
+                <DockPanel Grid.Row="4" LastChildFill="False">
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                        <Button x:Name="ComposerAddButton"
+                                Width="28"
+                                Height="28"
+                                Padding="0"
+                                AutomationProperties.Name="添加"
+                                Click="ComposerAddMenuClick"
+                                Style="{StaticResource ComposerChipButtonStyle}"
+                                ToolTip="{Binding AttachmentStatus}">
+                            <iconPacks:PackIconLucide Width="14" Height="14" Kind="Plus" />
+                        </Button>
+                        <Button x:Name="PermissionChip"
+                                Margin="8,0,0,0"
+                                AutomationProperties.Name="权限档"
+                                Click="PermissionChipClick"
+                                Style="{StaticResource ComposerChipButtonStyle}"
+                                ToolTip="选择 AI 助手权限档位">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding ModeDisplayText}" />
+                                <iconPacks:PackIconLucide Width="12"
+                                                          Height="12"
+                                                          Margin="4,0,0,0"
+                                                          VerticalAlignment="Center"
+                                                          Kind="ChevronDown" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button x:Name="ModelChip"
+                                AutomationProperties.Name="选择模型"
+                                Click="ModelChipClick"
+                                Style="{StaticResource ComposerChipButtonStyle}"
+                                ToolTip="{Binding ProviderStatus}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding SelectedModel.DisplayName}" />
+                                <iconPacks:PackIconLucide Width="12"
+                                                          Height="12"
+                                                          Margin="4,0,0,0"
+                                                          VerticalAlignment="Center"
+                                                          Kind="ChevronDown" />
+                            </StackPanel>
+                        </Button>
+                        <!--
+                            P72 发送/停止单按钮：34px 圆形（harness .primary 形态，
+                            Accent 底白图标，禁用 0.4 透明度）；发送/停止两态逻辑
+                            原样保留（Command/自动化名/ToolTip 在触发器里切换）。
+                        -->
+                        <Button x:Name="SendStopButton"
+                                Margin="8,0,0,0"
+                                Width="34"
+                                Height="34"
+                                Padding="0">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Setter Property="AutomationProperties.Name" Value="发送" />
+                                    <Setter Property="Command" Value="{Binding SendCommand}" />
+                                    <Setter Property="ToolTip" Value="发送" />
+                                    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="SendStopBorder"
+                                                        Background="{TemplateBinding Background}"
+                                                        CornerRadius="17"
+                                                        SnapsToDevicePixels="True">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="SendStopBorder" Property="Opacity" Value="0.9" />
+                                                    </Trigger>
+                                                    <Trigger Property="IsEnabled" Value="False">
+                                                        <Setter TargetName="SendStopBorder" Property="Opacity" Value="0.4" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsSending}" Value="True">
+                                            <Setter Property="AutomationProperties.Name" Value="停止请求" />
+                                            <Setter Property="Command" Value="{Binding StopCommand}" />
+                                            <Setter Property="ToolTip" Value="停止请求" />
+                                            <Setter Property="Background" Value="{DynamicResource DangerBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                            <Grid>
+                                <iconPacks:PackIconLucide Width="15"
+                                                          Height="15"
+                                                          Kind="Send"
+                                                          Foreground="White"
+                                                          Visibility="{Binding IsSending, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
+                                <iconPacks:PackIconLucide Width="15"
+                                                          Height="15"
+                                                          Kind="Square"
+                                                          Foreground="White"
+                                                          Visibility="{Binding IsSending, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            </Grid>
+                        </Button>
+                    </StackPanel>
+                </DockPanel>
             </Grid>
         </Border>
+        <!--
+            P72：统计胶囊行移出 composer 卡片，落在卡片正下方居中
+            （harness StatsPills 挂 conversation.composer.dock 的位置语义）。
+            无 usage 数据且无构成数据时整行隐藏，避免「0 轮 · 0 步」空占位。
+        -->
+        <StackPanel Grid.Row="7"
+                    Margin="0,8,0,0"
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal"
+                    Visibility="{Binding HasStatsRow, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <!--
+                P74-03：上下文构成分段条（dsh-context Current Context 的条形态）。
+                段块由 code-behind 按 ContextSegments 比例渲染（ColumnDefinition.Width
+                不可绑定）；条 100% = 已用上下文，窗口占用看摘要文本。
+            -->
+            <Button x:Name="ContextMeterPill"
+                    Height="24"
+                    AutomationProperties.Name="上下文构成"
+                    Click="ContextMeterPillClick"
+                    Style="{StaticResource StatPillButtonStyle}"
+                    ToolTip="上下文构成"
+                    Visibility="{Binding HasContextComposition, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center"
+                                              Kind="ChartColumnStacked" />
+                    <Border x:Name="ContextMeterBarShell"
+                            Width="140"
+                            Height="6"
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="上下文分段条"
+                            Background="{DynamicResource HairlineBrush}"
+                            ClipToBounds="True"
+                            CornerRadius="3">
+                        <StackPanel x:Name="ContextMeterBar" Orientation="Horizontal" />
+                    </Border>
+                    <TextBlock Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="{Binding ContextMeterSummary}" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="SessionStatsPill"
+                    Height="24"
+                    Margin="8,0,0,0"
+                    AutomationProperties.Name="会话统计"
+                    Click="SessionStatsPillClick"
+                    Style="{StaticResource StatPillButtonStyle}"
+                    ToolTip="会话统计"
+                    Visibility="{Binding HasUsageData, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center"
+                                              Kind="Gauge" />
+                    <TextBlock Margin="6,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="{Binding SessionStatsSummary}" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="TokenStatsPill"
+                    Height="24"
+                    Margin="8,0,0,0"
+                    AutomationProperties.Name="Token 用量"
+                    Click="TokenStatsPillClick"
+                    Style="{StaticResource StatPillButtonStyle}"
+                    ToolTip="Token 用量"
+                    Visibility="{Binding HasUsageData, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel Orientation="Horizontal">
+                    <iconPacks:PackIconLucide Width="14"
+                                              Height="14"
+                                              VerticalAlignment="Center"
+                                              Kind="Database" />
+                    <TextBlock Margin="6,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               Text="{Binding TokenStatsSummary}" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+        <!--
+            P72 三个 composer 下拉（harness side="top" 语义：Placement=Top 朝
+            输入框上方展开，空间不足时 WPF 自动向下翻转）。点击外部即关。
+        -->
+        <Popup x:Name="ComposerAddPopup"
+               AllowsTransparency="True"
+               Placement="Top"
+               PlacementTarget="{Binding ElementName=ComposerAddButton}"
+               StaysOpen="False">
+            <Border MinWidth="180"
+                    Padding="6"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource HairlineBrush}"
+                    BorderThickness="0.5"
+                    CornerRadius="{DynamicResource RadiusXl}"
+                    Effect="{DynamicResource ElevationProminentEffect}">
+                <!-- 功能菜单（P72）：按现有功能裁剪，当前只有添加附件一项。 -->
+                <Button Height="34"
+                        Padding="10,0"
+                        HorizontalContentAlignment="Left"
+                        AutomationProperties.Name="添加附件"
+                        Click="AttachFilesClick"
+                        Foreground="{DynamicResource TextPrimaryBrush}"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        ToolTip="添加附件">
+                    <StackPanel Orientation="Horizontal">
+                        <iconPacks:PackIconLucide Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"
+                                                  Foreground="{DynamicResource TextSecondaryBrush}"
+                                                  Kind="Paperclip" />
+                        <TextBlock Margin="8,0,0,0" Text="添加附件" />
+                    </StackPanel>
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Grid>
+                                <Border x:Name="AddMenuRow"
+                                        Padding="{TemplateBinding Padding}"
+                                        Background="{TemplateBinding Background}"
+                                        CornerRadius="8">
+                                    <ContentPresenter VerticalAlignment="Center" />
+                                </Border>
+                                <Border Background="{DynamicResource InteractionHoverBrush}"
+                                        CornerRadius="8"
+                                        IsHitTestVisible="False"
+                                        Opacity="0" />
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="AddMenuRow" Property="Background" Value="{DynamicResource InteractionHoverBrush}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </Border>
+        </Popup>
+        <Popup x:Name="PermissionPopup"
+               AllowsTransparency="True"
+               Placement="Top"
+               PlacementTarget="{Binding ElementName=PermissionChip}"
+               StaysOpen="False">
+            <Border MinWidth="200"
+                    Padding="6"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource HairlineBrush}"
+                    BorderThickness="0.5"
+                    CornerRadius="{DynamicResource RadiusXl}"
+                    Effect="{DynamicResource ElevationProminentEffect}">
+                <StackPanel>
+                    <!--
+                        条目沿用 EnumEqualsConverter 双向绑定（原分段开关同款模式），
+                        选中打勾由 ComposerMenuToggleStyle 的 IsChecked 触发显示。
+                    -->
+                    <ToggleButton AutomationProperties.Name="只读档"
+                                  Click="PermissionMenuItemClick"
+                                  Content="只读"
+                                  IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static ai:AiAssistantMode.ReadOnly}}"
+                                  Style="{StaticResource ComposerMenuToggleStyle}" />
+                    <ToggleButton Margin="0,2,0,0"
+                                  AutomationProperties.Name="写入档"
+                                  Click="PermissionMenuItemClick"
+                                  Content="写入（需确认）"
+                                  IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static ai:AiAssistantMode.Write}}"
+                                  Style="{StaticResource ComposerMenuToggleStyle}" />
+                    <!--
+                        P71-01：本地代理档，设置页开启后显示（Q6 裁决默认关）。
+                        VM 的 Mode setter 对未启用的程序化赋值兜底拦截。
+                    -->
+                    <ToggleButton Margin="0,2,0,0"
+                                  AutomationProperties.Name="本地代理档"
+                                  Click="PermissionMenuItemClick"
+                                  Content="本地代理"
+                                  IsChecked="{Binding Mode, Mode=TwoWay, Converter={StaticResource EnumEqualsConverter}, ConverterParameter={x:Static ai:AiAssistantMode.LocalAgent}}"
+                                  Style="{StaticResource ComposerMenuToggleStyle}"
+                                  Visibility="{Binding IsLocalAgentEnabled, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                </StackPanel>
+            </Border>
+        </Popup>
+        <Popup x:Name="ModelPopup"
+               AllowsTransparency="True"
+               Placement="Top"
+               PlacementTarget="{Binding ElementName=ModelChip}"
+               StaysOpen="False">
+            <Border MinWidth="220"
+                    MaxHeight="320"
+                    Padding="6"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource HairlineBrush}"
+                    BorderThickness="0.5"
+                    CornerRadius="{DynamicResource RadiusXl}"
+                    Effect="{DynamicResource ElevationProminentEffect}">
+                <!--
+                    模型列表：ListBox 原生选择逻辑（SelectedItem 双向绑定），
+                    条目模板对齐 harness 菜单行——选中行尾打勾。
+                -->
+                <ListBox Background="Transparent"
+                         BorderThickness="0"
+                         ItemsSource="{Binding AvailableModels}"
+                         SelectedItem="{Binding SelectedModel, Mode=TwoWay}"
+                         SelectionChanged="ModelMenuSelectionChanged">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Grid>
+                                            <Border x:Name="ModelMenuRow"
+                                                    Padding="10,0"
+                                                    CornerRadius="8"
+                                                    Background="Transparent">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <ContentPresenter VerticalAlignment="Center" />
+                                                    <TextBlock x:Name="ModelMenuCheck"
+                                                               Grid.Column="1"
+                                                               VerticalAlignment="Center"
+                                                               FontFamily="Segoe MDL2 Assets"
+                                                               FontSize="12"
+                                                               Foreground="{DynamicResource AccentBrush}"
+                                                               Text="&#xE73E;"
+                                                               Visibility="Collapsed" />
+                                                </Grid>
+                                            </Border>
+                                            <Border Background="{DynamicResource InteractionHoverBrush}"
+                                                    CornerRadius="8"
+                                                    IsHitTestVisible="False"
+                                                    Opacity="0" />
+                                        </Grid>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ModelMenuRow" Property="Background" Value="{DynamicResource InteractionHoverBrush}" />
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="ModelMenuCheck" Property="Visibility" Value="Visible" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Margin="0,9" Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+        </Popup>
+        <!--
+            P70-04：两枚胶囊的详情弹窗。Popup 不参与布局，挂在根 Grid 即可；
+            StaysOpen=False 点击外部即关，Placement=Top 朝输入框上方展开。
+        -->
+        <Popup x:Name="ContextMeterPopup"
+               AllowsTransparency="True"
+               Placement="Top"
+               PlacementTarget="{Binding ElementName=ContextMeterPill}"
+               StaysOpen="False">
+            <Border MinWidth="240"
+                    Padding="12"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource HairlineBrush}"
+                    BorderThickness="0.5"
+                    CornerRadius="{DynamicResource RadiusXl}"
+                    Effect="{DynamicResource ElevationProminentEffect}">
+                <StackPanel>
+                    <TextBlock FontWeight="SemiBold" Text="上下文构成" />
+                    <ItemsControl Margin="0,6,0,0" ItemsSource="{Binding ContextSegments}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel MinHeight="24" Margin="0,1">
+                                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                                        <Ellipse Width="8"
+                                                 Height="8"
+                                                 VerticalAlignment="Center"
+                                                 Fill="{Binding Color, Converter={StaticResource ColorStringToBrushConverter}}" />
+                                        <TextBlock Margin="8,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   Text="{Binding Name}" />
+                                    </StackPanel>
+                                    <TextBlock DockPanel.Dock="Right"
+                                               FontFamily="Cascadia Mono, Microsoft YaHei UI"
+                                               Text="{Binding Detail}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </Popup>
+        <Popup x:Name="SessionStatsPopup"
+               AllowsTransparency="True"
+               Placement="Top"
+               PlacementTarget="{Binding ElementName=SessionStatsPill}"
+               StaysOpen="False">
+            <Border MinWidth="220"
+                    Padding="12"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource HairlineBrush}"
+                    BorderThickness="0.5"
+                    CornerRadius="{DynamicResource RadiusXl}"
+                    Effect="{DynamicResource ElevationProminentEffect}">
+                <ItemsControl ItemsSource="{Binding SessionStatRows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel MinHeight="24" Margin="0,1">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Text="{Binding Label}" />
+                                <TextBlock DockPanel.Dock="Right"
+                                           FontFamily="Cascadia Mono, Microsoft YaHei UI"
+                                           Text="{Binding Value}" />
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </Popup>
+        <Popup x:Name="TokenStatsPopup"
+               AllowsTransparency="True"
+               Placement="Top"
+               PlacementTarget="{Binding ElementName=TokenStatsPill}"
+               StaysOpen="False">
+            <Border MinWidth="220"
+                    Padding="12"
+                    Background="{DynamicResource SurfaceBrush}"
+                    BorderBrush="{DynamicResource HairlineBrush}"
+                    BorderThickness="0.5"
+                    CornerRadius="{DynamicResource RadiusXl}"
+                    Effect="{DynamicResource ElevationProminentEffect}">
+                <ItemsControl ItemsSource="{Binding TokenStatRows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel MinHeight="24" Margin="0,1">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Text="{Binding Label}" />
+                                <TextBlock DockPanel.Dock="Right"
+                                           FontFamily="Cascadia Mono, Microsoft YaHei UI"
+                                           Text="{Binding Value}" />
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </Popup>
         <Border Grid.Row="5"
                 Margin="0,10,0,0"
                 Padding="16"
@@ -458,5 +1679,6 @@
                 </StackPanel>
             </Grid>
         </Border>
+        </Grid>
     </Grid>
 </UserControl>

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CcCalendar.Core.AI;
 using CcCalendar.Core.Configuration;
 using CcCalendar.Core.Security;
@@ -15,8 +16,11 @@ public sealed class AiSettingsViewModel : ObservableObject
     private readonly Func<AiProviderSettings, CancellationToken, Task>? legacySettingsChanged;
     private readonly Func<IReadOnlyList<AiModelConfiguration>, string?, CancellationToken, Task>?
         configurationsChanged;
+    // P74-04：视觉桥选择的即时持久化回调（宿主写设置），null = 未接线。
+    private readonly Action<string?>? visualBridgeChanged;
     private string apiKeyInput = string.Empty;
     private string connectionStatus = string.Empty;
+    private string contextWindowTokensText = string.Empty;
     private string displayName;
     private string? editingConfigurationId;
     private string endpoint;
@@ -24,6 +28,10 @@ public sealed class AiSettingsViewModel : ObservableObject
     private bool localOnlyMode;
     private string model;
     private AiProviderKind provider;
+    private string visualBridgeModelId;
+
+    /// <summary>P74-04：视觉桥「不启用」哨兵——Id 为空串，随 ComboBox 选中即关闭。</summary>
+    internal const string DisableVisualBridgeModelId = "";
 
     public AiSettingsViewModel(
         AiProviderSettings settings,
@@ -43,7 +51,9 @@ public sealed class AiSettingsViewModel : ObservableObject
         ISecretStore secretStore,
         IAiConnectionTester connectionTester,
         Func<IReadOnlyList<AiModelConfiguration>, string?, CancellationToken, Task>?
-            configurationsChanged = null)
+            configurationsChanged = null,
+        string? visualBridgeModelId = null,
+        Action<string?>? visualBridgeChanged = null)
     {
         this.modelCatalog = modelCatalog
             ?? throw new ArgumentNullException(nameof(modelCatalog));
@@ -51,6 +61,8 @@ public sealed class AiSettingsViewModel : ObservableObject
         this.connectionTester = connectionTester
             ?? throw new ArgumentNullException(nameof(connectionTester));
         this.configurationsChanged = configurationsChanged;
+        this.visualBridgeChanged = visualBridgeChanged;
+        this.visualBridgeModelId = visualBridgeModelId ?? DisableVisualBridgeModelId;
         AiProviderSettings settings = modelCatalog.CurrentSettings;
         provider = settings.Provider;
         endpoint = settings.Endpoint;
@@ -58,11 +70,15 @@ public sealed class AiSettingsViewModel : ObservableObject
         displayName = modelCatalog.SelectedModel?.DisplayName ?? settings.Model;
         editingConfigurationId = modelCatalog.SelectedModel?.Id;
         localOnlyMode = settings.LocalOnlyMode;
+        contextWindowTokensText = modelCatalog.SelectedModel?.ContextWindowTokens is { } window
+            ? window.ToString(CultureInfo.InvariantCulture)
+            : string.Empty;
         SaveCommand = new AsyncRelayCommand(() => SaveAsync(CancellationToken.None));
         TestConnectionCommand = new AsyncRelayCommand(
             () => TestConnectionAsync(CancellationToken.None));
         DeleteConfigurationCommand = new AsyncRelayCommand<AiModelConfiguration>(
             configuration => DeleteConfigurationAsync(configuration, CancellationToken.None));
+        RefreshVisualBridgeOptions();
     }
 
     public AiProviderKind Provider
@@ -97,7 +113,41 @@ public sealed class AiSettingsViewModel : ObservableObject
         set => SetProperty(ref displayName, value);
     }
 
+    /// <summary>
+    /// 上下文窗口（tokens）表单文本（P74-01）：空 = 未设置；保存时解析为正整数
+    /// 写入 AiModelConfiguration.ContextWindowTokens，非法输入阻止保存。
+    /// </summary>
+    public string ContextWindowTokensText
+    {
+        get => contextWindowTokensText;
+        set => SetProperty(ref contextWindowTokensText, value);
+    }
+
     public ObservableCollection<AiModelConfiguration> ConfiguredModels => modelCatalog.Models;
+
+    /// <summary>
+    /// P74-04：视觉转写模型 Id（空串 = 不启用）。选择即生效——与主模型选择
+    /// 一致地即时持久化，无需点保存。
+    /// </summary>
+    public string VisualBridgeModelId
+    {
+        get => visualBridgeModelId;
+        set
+        {
+            string normalized = value ?? DisableVisualBridgeModelId;
+            if (SetProperty(ref visualBridgeModelId, normalized))
+            {
+                visualBridgeChanged?.Invoke(
+                    normalized.Length == 0 ? null : normalized);
+            }
+        }
+    }
+
+    /// <summary>
+    /// P74-04：视觉桥下拉选项——哨兵「不启用」打头，接全部已配置模型
+    /// （模型增删后由 RefreshVisualBridgeOptions 重建）。
+    /// </summary>
+    public IReadOnlyList<AiModelConfiguration> VisualBridgeOptions { get; private set; } = [];
 
     public AiModelConfiguration? SelectedConfiguration
     {
@@ -189,6 +239,21 @@ public sealed class AiSettingsViewModel : ObservableObject
             return;
         }
 
+        // P74-01：上下文窗口为可选元数据，填了就必须是正整数。
+        int? contextWindowTokens = null;
+        string windowText = ContextWindowTokensText.Trim();
+        if (windowText.Length > 0)
+        {
+            if (!int.TryParse(windowText, NumberStyles.Integer, CultureInfo.InvariantCulture, out int window)
+                || window <= 0)
+            {
+                ConnectionStatus = "上下文窗口必须是正整数（tokens），留空表示未设置";
+                return;
+            }
+
+            contextWindowTokens = window;
+        }
+
         try
         {
             AiProviderPrivacyPolicy.EnsureAllowed(CreateSettings());
@@ -220,9 +285,11 @@ public sealed class AiSettingsViewModel : ObservableObject
         var configuration = new AiModelConfiguration(
             editingConfigurationId ?? Guid.NewGuid().ToString("N"),
             DisplayName.Trim(),
-            settings);
+            settings,
+            contextWindowTokens);
         editingConfigurationId = configuration.Id;
         modelCatalog.Upsert(configuration);
+        RefreshVisualBridgeOptions();
         await configurationsChanged(
             [.. modelCatalog.Models],
             modelCatalog.SelectedModel?.Id,
@@ -266,6 +333,7 @@ public sealed class AiSettingsViewModel : ObservableObject
         }
 
         modelCatalog.Remove(configuration);
+        RefreshVisualBridgeOptions();
         AiModelConfiguration? selected = modelCatalog.SelectedModel;
         editingConfigurationId = selected?.Id;
         if (selected is not null)
@@ -289,13 +357,39 @@ public sealed class AiSettingsViewModel : ObservableObject
         endpoint = configuration.Settings.Endpoint;
         model = configuration.Settings.Model;
         localOnlyMode = configuration.Settings.LocalOnlyMode;
+        contextWindowTokensText = configuration.ContextWindowTokens is { } window
+            ? window.ToString(CultureInfo.InvariantCulture)
+            : string.Empty;
         OnPropertyChanged(nameof(DisplayName));
         OnPropertyChanged(nameof(Provider));
         OnPropertyChanged(nameof(Endpoint));
         OnPropertyChanged(nameof(Model));
         OnPropertyChanged(nameof(LocalOnlyMode));
         OnPropertyChanged(nameof(RequiresApiKey));
+        OnPropertyChanged(nameof(ContextWindowTokensText));
         _ = LoadSecretStatusAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// P74-04：重建视觉桥选项集；当前选择的模型被删除时回退「不启用」
+    /// 并即时持久化，避免悬挂的 Id 指向不存在的配置。
+    /// </summary>
+    private void RefreshVisualBridgeOptions()
+    {
+        VisualBridgeOptions =
+        [
+            new AiModelConfiguration(
+                DisableVisualBridgeModelId,
+                "不启用",
+                modelCatalog.CurrentSettings),
+            .. modelCatalog.Models,
+        ];
+        OnPropertyChanged(nameof(VisualBridgeOptions));
+        if (visualBridgeModelId.Length > 0
+            && modelCatalog.Models.All(model => model.Id != visualBridgeModelId))
+        {
+            VisualBridgeModelId = DisableVisualBridgeModelId;
+        }
     }
 
     private void ApplyProviderDefaults(AiProviderKind value)

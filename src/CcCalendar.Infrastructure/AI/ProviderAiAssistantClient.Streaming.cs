@@ -31,32 +31,34 @@ public sealed partial class ProviderAiAssistantClient
             throw new InvalidOperationException("请先在设置中保存 API Key。");
         }
 
-        IReadOnlyList<AiToolDefinition> tools = request.Mode == AiAssistantMode.Write
-            ? [.. toolCatalog.Definitions, .. writeToolCatalog.Definitions]
-            : toolCatalog.Definitions;
+        IReadOnlyList<AiToolDefinition> tools = ResolveTools(request.Mode, request.SubagentDepth);
         AiRequestContext context = MinimalAiContextBuilder.Build(
             request.UserMessage,
             tools,
             request.Mode,
             timeProvider.GetLocalNow(),
             request.Conversation);
+        // P74-02：流开始前先发一次上下文构成估算，宿主渲染 token 分段条。
+        await onUpdate(
+            AiTokenEstimator.EstimateComposition(context),
+            cancellationToken);
         switch (settings.Provider)
         {
             case AiProviderKind.OpenAiResponses:
                 await StreamResponsesAsync(
-                    settings, endpoint, apiKey!, context, request.Mode, onUpdate, cancellationToken);
+                    settings, endpoint, apiKey!, context, request, onUpdate, cancellationToken);
                 break;
             case AiProviderKind.Anthropic:
                 await StreamAnthropicAsync(
-                    settings, endpoint, apiKey!, context, request.Mode, onUpdate, cancellationToken);
+                    settings, endpoint, apiKey!, context, request, onUpdate, cancellationToken);
                 break;
             case AiProviderKind.OpenAiCompatible:
                 await StreamOpenAiChatAsync(
-                    settings, endpoint, apiKey, context, request.Mode, onUpdate, cancellationToken);
+                    settings, endpoint, apiKey, context, request, onUpdate, cancellationToken);
                 break;
             case AiProviderKind.Ollama:
                 await StreamOllamaAsync(
-                    settings, endpoint, context, request.Mode, onUpdate, cancellationToken);
+                    settings, endpoint, context, request, onUpdate, cancellationToken);
                 break;
             default:
                 throw new InvalidOperationException("不支持的 AI 提供商。");
@@ -68,7 +70,7 @@ public sealed partial class ProviderAiAssistantClient
         Uri endpoint,
         string? apiKey,
         AiRequestContext context,
-        AiAssistantMode mode,
+        AiAssistantRequest request,
         Func<AiAssistantUpdate, CancellationToken, Task> onUpdate,
         CancellationToken cancellationToken)
     {
@@ -79,7 +81,9 @@ public sealed partial class ProviderAiAssistantClient
         AddConversationMessages(messages, context.Conversation);
         messages.Add(CreateMessage("user", context.UserMessage));
         JsonArray tools = CreateChatTools(context.Tools);
-        for (int round = 0; round < MaximumToolRounds; round++)
+        // P72（用户裁决）：不设工具轮次上限，由模型自行收敛；
+        // 失控风险由调用方取消（停止按钮 → cancellationToken）兜底。
+        for (int round = 0; ; round++)
         {
             var body = new JsonObject
             {
@@ -87,6 +91,9 @@ public sealed partial class ProviderAiAssistantClient
                 ["messages"] = messages.DeepClone(),
                 ["tools"] = tools.DeepClone(),
                 ["stream"] = true,
+                // 要求服务端在流末尾回 usage chunk；个别 OpenAI 兼容网关不认识该字段
+                // 可能 400（已知风险），缺失 usage 时静默不发事件兜底（P70-03）。
+                ["stream_options"] = new JsonObject { ["include_usage"] = true },
             };
             StreamedChatResponse streamed = await PostStreamToolRoundAsync(
                 settings.Provider,
@@ -106,12 +113,10 @@ public sealed partial class ProviderAiAssistantClient
             foreach (ToolCall toolCall in streamed.ToolCalls)
             {
                 string result = await ExecuteStreamingToolAsync(
-                    toolCall, mode, onUpdate, cancellationToken);
+                    toolCall, request, onUpdate, cancellationToken);
                 messages.Add(CreateChatToolMessage(settings.Provider, toolCall, result));
             }
         }
-
-        throw new InvalidOperationException("模型工具调用次数超过限制。");
     }
 
     /// <summary>
@@ -167,7 +172,17 @@ public sealed partial class ProviderAiAssistantClient
 
                 JsonObject root = JsonNode.Parse(data)?.AsObject()
                     ?? throw new InvalidDataException("OpenAI 流返回了空事件。");
-                JsonObject? delta = root["choices"]?[0]?["delta"]?.AsObject();
+                // usage chunk 的 choices 为空数组，必须先于 delta 判空处理；
+                // 网关忽略 include_usage 时不回 usage，静默不发（P70-03）。
+                if (TryCreateOpenAiChatUsage(root) is { } usage)
+                {
+                    await onUpdate(usage, token);
+                }
+
+                // usage chunk 的 choices 是空数组，JsonArray 越界索引会抛异常，须判空。
+                JsonObject? delta = root["choices"] is JsonArray { Count: > 0 } choices
+                    ? choices[0]?["delta"]?.AsObject()
+                    : null;
                 if (delta is null)
                 {
                     return;
@@ -216,7 +231,7 @@ public sealed partial class ProviderAiAssistantClient
         AiProviderSettings settings,
         Uri endpoint,
         AiRequestContext context,
-        AiAssistantMode mode,
+        AiAssistantRequest request,
         Func<AiAssistantUpdate, CancellationToken, Task> onUpdate,
         CancellationToken cancellationToken)
     {
@@ -227,7 +242,7 @@ public sealed partial class ProviderAiAssistantClient
         AddConversationMessages(messages, context.Conversation);
         messages.Add(CreateMessage("user", context.UserMessage));
         JsonArray tools = CreateChatTools(context.Tools);
-        for (int round = 0; round < MaximumToolRounds; round++)
+        for (int round = 0; ; round++)
         {
             var body = new JsonObject
             {
@@ -252,12 +267,10 @@ public sealed partial class ProviderAiAssistantClient
             foreach (ToolCall toolCall in streamed.ToolCalls)
             {
                 string result = await ExecuteStreamingToolAsync(
-                    toolCall, mode, onUpdate, cancellationToken);
+                    toolCall, request, onUpdate, cancellationToken);
                 messages.Add(CreateChatToolMessage(settings.Provider, toolCall, result));
             }
         }
-
-        throw new InvalidOperationException("模型工具调用次数超过限制。");
     }
 
     private static async Task<StreamedChatResponse> ReadOllamaStreamAsync(
@@ -275,6 +288,13 @@ public sealed partial class ProviderAiAssistantClient
 
             JsonObject root = JsonNode.Parse(line)?.AsObject()
                 ?? throw new InvalidDataException("Ollama 流返回了空事件。");
+            // prompt_eval_count/eval_count 只出现在最终 chunk，先于 message 判空，
+            // 避免无 message 的收尾 chunk 丢用量；中间 chunk 无计数则静默（P70-03）。
+            if (TryCreateOllamaUsage(root) is { } usage)
+            {
+                await onUpdate(usage, cancellationToken);
+            }
+
             JsonObject? message = root["message"]?.AsObject();
             if (message is null)
             {
@@ -305,14 +325,14 @@ public sealed partial class ProviderAiAssistantClient
         Uri endpoint,
         string apiKey,
         AiRequestContext context,
-        AiAssistantMode mode,
+        AiAssistantRequest request,
         Func<AiAssistantUpdate, CancellationToken, Task> onUpdate,
         CancellationToken cancellationToken)
     {
         JsonArray input = CreateConversationMessages(context.Conversation, context.UserMessage);
         JsonArray tools = CreateOpenAiTools(context.Tools);
         string? previousResponseId = null;
-        for (int round = 0; round < MaximumToolRounds; round++)
+        for (int round = 0; ; round++)
         {
             var body = new JsonObject
             {
@@ -345,7 +365,7 @@ public sealed partial class ProviderAiAssistantClient
             foreach (ToolCall toolCall in streamed.ToolCalls)
             {
                 string result = await ExecuteStreamingToolAsync(
-                    toolCall, mode, onUpdate, cancellationToken);
+                    toolCall, request, onUpdate, cancellationToken);
                 input.Add(new JsonObject
                 {
                     ["type"] = "function_call_output",
@@ -354,8 +374,6 @@ public sealed partial class ProviderAiAssistantClient
                 });
             }
         }
-
-        throw new InvalidOperationException("模型工具调用次数超过限制。");
     }
 
     private static async Task<StreamedResponsesResponse> ReadResponsesStreamAsync(
@@ -419,6 +437,10 @@ public sealed partial class ProviderAiAssistantClient
                 {
                     responseId = response["id"]?.GetValue<string>();
                     AddCompletedResponseCalls(response, calls);
+                    if (TryCreateResponsesUsage(response) is { } usage)
+                    {
+                        await onUpdate(usage, token);
+                    }
                 }
             },
             cancellationToken);
@@ -430,7 +452,7 @@ public sealed partial class ProviderAiAssistantClient
         Uri endpoint,
         string apiKey,
         AiRequestContext context,
-        AiAssistantMode mode,
+        AiAssistantRequest request,
         Func<AiAssistantUpdate, CancellationToken, Task> onUpdate,
         CancellationToken cancellationToken)
     {
@@ -438,7 +460,7 @@ public sealed partial class ProviderAiAssistantClient
         AddConversationMessages(messages, context.Conversation);
         messages.Add(CreateMessage("user", context.UserMessage));
         JsonArray tools = CreateAnthropicTools(context.Tools);
-        for (int round = 0; round < MaximumToolRounds; round++)
+        for (int round = 0; ; round++)
         {
             var body = new JsonObject
             {
@@ -470,7 +492,7 @@ public sealed partial class ProviderAiAssistantClient
             foreach (ToolCall toolCall in streamed.ToolCalls)
             {
                 string result = await ExecuteStreamingToolAsync(
-                    toolCall, mode, onUpdate, cancellationToken);
+                    toolCall, request, onUpdate, cancellationToken);
                 toolResults.Add(new JsonObject
                 {
                     ["type"] = "tool_result",
@@ -481,8 +503,6 @@ public sealed partial class ProviderAiAssistantClient
 
             messages.Add(new JsonObject { ["role"] = "user", ["content"] = toolResults });
         }
-
-        throw new InvalidOperationException("模型工具调用次数超过限制。");
     }
 
     private static async Task<StreamedAnthropicResponse> ReadAnthropicStreamAsync(
@@ -491,6 +511,12 @@ public sealed partial class ProviderAiAssistantClient
         CancellationToken cancellationToken)
     {
         var calls = new Dictionary<int, StreamingToolCall>();
+        // Anthropic 把 usage 拆两段：message_start 带 input/cache 计数，message_delta
+        // 才有最终 output_tokens，暂存后合并成一次完整事件发射（P70-03）。
+        long? inputTokens = null;
+        long? cachedTokens = null;
+        long? cacheWriteTokens = null;
+        string? model = null;
         await ReadSseAsync(
             reader,
             async (_, data, token) =>
@@ -499,6 +525,35 @@ public sealed partial class ProviderAiAssistantClient
                     ?? throw new InvalidDataException("Anthropic 流返回了空事件。");
                 string type = root["type"]?.GetValue<string>() ?? string.Empty;
                 int index = root["index"]?.GetValue<int>() ?? 0;
+                if (type == "message_start" && root["message"] is JsonObject startMessage)
+                {
+                    if (startMessage["usage"] is JsonObject startUsage)
+                    {
+                        inputTokens = GetTokenCount(startUsage, "input_tokens");
+                        cachedTokens = GetTokenCount(startUsage, "cache_read_input_tokens");
+                        cacheWriteTokens = GetTokenCount(startUsage, "cache_creation_input_tokens");
+                    }
+
+                    model ??= startMessage["model"]?.GetValue<string>();
+                    return;
+                }
+
+                if (type == "message_delta" && root["usage"] is JsonObject deltaUsage)
+                {
+                    // 两处都无 usage 视为提供商未上报，静默不发。
+                    if (inputTokens is not null || GetTokenCount(deltaUsage, "output_tokens") is not null)
+                    {
+                        await onUpdate(new AiUsageUpdate(
+                            inputTokens ?? 0,
+                            GetTokenCount(deltaUsage, "output_tokens") ?? 0,
+                            cachedTokens,
+                            cacheWriteTokens,
+                            Model: model), token);
+                    }
+
+                    return;
+                }
+
                 if (type == "content_block_start"
                     && root["content_block"] is JsonObject block
                     && block["type"]?.GetValue<string>() == "tool_use")
@@ -558,18 +613,117 @@ public sealed partial class ProviderAiAssistantClient
 
     private async Task<string> ExecuteStreamingToolAsync(
         ToolCall toolCall,
-        AiAssistantMode mode,
+        AiAssistantRequest request,
         Func<AiAssistantUpdate, CancellationToken, Task> onUpdate,
         CancellationToken cancellationToken)
     {
-        var proposals = new List<AiAssistantProposal>();
-        string result = await ExecuteToolAsync(toolCall, mode, proposals, cancellationToken);
-        foreach (AiAssistantProposal proposal in proposals)
+        // P71-03：spawn_subagent 最先分流——委派不发工具行事件（子代理在 UI 是
+        // 折叠卡，生命周期由 AiSubagentUpdate 包装事件驱动），也不审批（委派本身
+        // 不写入；子代理子会话内的写工具各自走审批）。
+        if (toolCall.Name == LocalAgentAiToolCatalog.SpawnSubagentToolName)
         {
-            await onUpdate(new AiProposalUpdate(proposal), cancellationToken);
+            var spawnProposals = new List<AiAssistantProposal>();
+            return await ExecuteToolAsync(
+                toolCall, request, spawnProposals, onUpdate, cancellationToken);
         }
 
-        return result;
+        // P70-05：工具轮次此前静默执行，UI 只看到最终提案卡；执行前后各发一次
+        // 可见性事件，让消息流中出现 ToolRow。摘要的生成与截断规则集中在下面两个 helper。
+        string argsSummary = SummarizeToolArguments(toolCall.Arguments);
+        // P71-02：写入类本地工具执行前先弹审批——先发 PendingApproval 事件（UI 落
+        // 审批行），再等宿主回调裁决；拒绝返回 error JSON 让模型自纠，不算异常。
+        if (request.Mode == AiAssistantMode.LocalAgent
+            && LocalAgentAiToolCatalog.RequiresApproval(toolCall.Name)
+            && !IsToolAlwaysAllowed(toolCall.Name))
+        {
+            await onUpdate(
+                new AiToolCallUpdate(toolCall.Name, argsSummary, AiToolCallState.PendingApproval),
+                cancellationToken);
+            if (await RequestToolApprovalAsync(request, toolCall.Name, cancellationToken)
+                == AiToolApprovalDecision.Deny)
+            {
+                await onUpdate(
+                    new AiToolCallUpdate(toolCall.Name, argsSummary, AiToolCallState.Error, "用户已拒绝"),
+                    cancellationToken);
+                return ToolDeniedResult(toolCall.Name);
+            }
+        }
+
+        await onUpdate(
+            new AiToolCallUpdate(toolCall.Name, argsSummary, AiToolCallState.Running),
+            cancellationToken);
+        try
+        {
+            var proposals = new List<AiAssistantProposal>();
+            string result = await ExecuteToolAsync(
+                toolCall, request, proposals, onUpdate, cancellationToken);
+            foreach (AiAssistantProposal proposal in proposals)
+            {
+                await onUpdate(new AiProposalUpdate(proposal), cancellationToken);
+            }
+
+            await onUpdate(
+                new AiToolCallUpdate(
+                    toolCall.Name,
+                    argsSummary,
+                    AiToolCallState.Ok,
+                    SummarizeToolResult(result)),
+                cancellationToken);
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            // 取消不是工具失败：不发 Error 事件（Running 行由 VM 的流结束兜底收束），
+            // 原样上抛保持既有取消语义。
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // 失败也要让用户看到（工具行转红），发完事件后原样上抛，
+            // 异常处理流与改动前完全一致。
+            await onUpdate(
+                new AiToolCallUpdate(
+                    toolCall.Name,
+                    argsSummary,
+                    AiToolCallState.Error,
+                    exception.Message),
+                cancellationToken);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 工具参数的一行摘要（P70-05）：取前两个键值对用「k: v · k: v」拼接，
+    /// 超过 40 字符截断加省略号——工具行空间小，只要能认出模型想干什么即可。
+    /// </summary>
+    private static string SummarizeToolArguments(JsonElement arguments)
+    {
+        if (arguments.ValueKind != JsonValueKind.Object)
+        {
+            return string.Empty;
+        }
+
+        var parts = new List<string>();
+        foreach (JsonProperty property in arguments.EnumerateObject().Take(2))
+        {
+            string value = property.Value.ValueKind == JsonValueKind.String
+                ? property.Value.GetString() ?? string.Empty
+                : property.Value.GetRawText();
+            parts.Add($"{property.Name}: {value}");
+        }
+
+        string summary = string.Join(" · ", parts);
+        return summary.Length <= 40 ? summary : summary[..40] + "…";
+    }
+
+    /// <summary>
+    /// 工具结果的一行摘要（P70-05）：压平换行取前 60 字符——查询类工具回大 JSON，
+    /// 展开区只看形态不看全量。
+    /// </summary>
+    private static string SummarizeToolResult(string result)
+    {
+        string oneLine = result.Replace("\r", " ").Replace("\n", " ").Trim();
+        return oneLine.Length <= 60 ? oneLine : oneLine[..60] + "…";
     }
 
     private async Task<T> PostStreamAsync<T>(
@@ -639,6 +793,75 @@ public sealed partial class ProviderAiAssistantClient
 
     private static IReadOnlyList<ToolCall> ToToolCalls(IEnumerable<StreamingToolCall> calls) =>
         [.. calls.Select(call => call.Build())];
+
+    /// <summary>读取 token 计数；节点缺失或非整数时返回 null（各网关回传字段不一，缺省不视为 0）。</summary>
+    private static long? GetTokenCount(JsonObject? container, string property)
+    {
+        return container?[property] is JsonValue value && value.TryGetValue(out long count)
+            ? count
+            : null;
+    }
+
+    private static long? GetNestedTokenCount(
+        JsonObject? container,
+        string parentProperty,
+        string property) =>
+        container?[parentProperty] is JsonObject parent ? GetTokenCount(parent, property) : null;
+
+    /// <summary>
+    /// 解析 OpenAI 兼容流的 usage chunk：OpenAI 风格嵌套于 prompt/completion_tokens_details，
+    /// DeepSeek 风格平铺 prompt_cache_hit_tokens，两者取有值者；无 usage 返回 null（静默）。
+    /// </summary>
+    private static AiUsageUpdate? TryCreateOpenAiChatUsage(JsonObject root)
+    {
+        if (root["usage"] is not JsonObject usage)
+        {
+            return null;
+        }
+
+        return new AiUsageUpdate(
+            GetTokenCount(usage, "prompt_tokens") ?? 0,
+            GetTokenCount(usage, "completion_tokens") ?? 0,
+            GetNestedTokenCount(usage, "prompt_tokens_details", "cached_tokens")
+                ?? GetTokenCount(usage, "prompt_cache_hit_tokens"),
+            ReasoningTokens: GetNestedTokenCount(
+                usage,
+                "completion_tokens_details",
+                "reasoning_tokens"),
+            Model: root["model"]?.GetValue<string>());
+    }
+
+    /// <summary>解析 Responses 流 response.completed 的 usage；无 usage 返回 null（静默）。</summary>
+    private static AiUsageUpdate? TryCreateResponsesUsage(JsonObject response)
+    {
+        if (response["usage"] is not JsonObject usage)
+        {
+            return null;
+        }
+
+        return new AiUsageUpdate(
+            GetTokenCount(usage, "input_tokens") ?? 0,
+            GetTokenCount(usage, "output_tokens") ?? 0,
+            GetNestedTokenCount(usage, "input_tokens_details", "cached_tokens"),
+            ReasoningTokens: GetNestedTokenCount(
+                usage,
+                "output_tokens_details",
+                "reasoning_tokens"),
+            Model: response["model"]?.GetValue<string>());
+    }
+
+    /// <summary>解析 Ollama 最终 chunk 的 prompt_eval_count/eval_count；无计数返回 null（静默）。</summary>
+    private static AiUsageUpdate? TryCreateOllamaUsage(JsonObject root)
+    {
+        long? promptEvalCount = GetTokenCount(root, "prompt_eval_count");
+        long? evalCount = GetTokenCount(root, "eval_count");
+        return promptEvalCount is null && evalCount is null
+            ? null
+            : new AiUsageUpdate(
+                promptEvalCount ?? 0,
+                evalCount ?? 0,
+                Model: root["model"]?.GetValue<string>());
+    }
 
     private static JsonObject CreateAssistantToolMessage(
         IReadOnlyList<ToolCall> calls,

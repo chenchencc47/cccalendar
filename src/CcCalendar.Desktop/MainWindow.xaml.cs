@@ -21,6 +21,12 @@ namespace CcCalendar.Desktop;
 
 public partial class MainWindow : Window, IDisposable, INotifyPropertyChanged
 {
+    // P70-06b：主导航两态宽度（展开 200 / rail 48）。列宽直切不加动画——
+    // ColumnDefinition.Width 是 GridLength，做补间需要自定义 AnimationTimeline，
+    // 相比收益（一瞬的开合）不值得为它建基建（与 P70-06a 会话栏一致）。
+    private const double NavExpandedWidth = 200;
+    private const double NavRailWidth = 48;
+
     private readonly CalendarDataService dataService;
     private readonly Func<Task> externalDataChanged = () => Task.CompletedTask;
     private readonly IcsCalendarFileService icsCalendarFileService;
@@ -77,7 +83,17 @@ public partial class MainWindow : Window, IDisposable, INotifyPropertyChanged
         Func<Task>? externalDataChanged = null,
         Func<DateOnly, TimeZoneInfo, Task<TeamRoomBoardSnapshot?>>? loadTeamRoomBoard = null,
         Func<string, string, DateOnly, TimeOnly, TimeOnly, string?, Task<bool>>? createTeamBooking = null,
-        Func<RoomOccupiedBlock, Task>? deleteRemoteBooking = null)
+        Func<RoomOccupiedBlock, Task>? deleteRemoteBooking = null,
+        bool assistantSessionsCollapsed = false,
+        Action<bool>? assistantSessionsCollapsedChanged = null,
+        bool mainNavCollapsed = false,
+        Action<bool>? mainNavCollapsedChanged = null,
+        bool topSearchCollapsed = false,
+        Action<bool>? topSearchCollapsedChanged = null,
+        Func<bool>? localAgentEnabled = null,
+        Action<string>? alwaysAllowLocalTool = null,
+        IVisionTranscriber? visionTranscriber = null,
+        Func<string?>? getVisualBridgeModelId = null)
     {
         InitializeComponent();
         this.externalDataChanged = externalDataChanged ?? (() => Task.CompletedTask);
@@ -104,7 +120,13 @@ public partial class MainWindow : Window, IDisposable, INotifyPropertyChanged
             TimeZoneInfo.Local.Id,
             aiAssistantClient,
             aiModelCatalog,
-            new CcCalendar.Desktop.AI.AiChatHistoryStore());
+            new CcCalendar.Desktop.AI.AiChatHistoryStore(),
+            assistantSessionsCollapsed,
+            assistantSessionsCollapsedChanged,
+            localAgentEnabled,
+            alwaysAllowLocalTool,
+            visionTranscriber,
+            getVisualBridgeModelId);
         var clipboardHistory = new ClipboardHistoryService(
             ApplicationPaths.DatabasePath,
             ApplicationPaths.ClipboardStorageDirectory,
@@ -128,8 +150,17 @@ public partial class MainWindow : Window, IDisposable, INotifyPropertyChanged
             chineseCalendarService,
             weather,
             assistant,
-            tools);
+            tools,
+            mainNavCollapsed,
+            mainNavCollapsedChanged,
+            topSearchCollapsed,
+            topSearchCollapsedChanged);
         DataContext = viewModel;
+        // P70-06b：导航列宽跟随收起状态。ColumnDefinition.Width 不是可绑定属性
+        // （P70-06a 教训），DataTrigger 的 Setter 也无法命令列定义，
+        // 由 VM 属性变更回调在 code-behind 直切。
+        viewModel.PropertyChanged += NavColumnWidthChanged;
+        UpdateNavColumnWidth(viewModel.IsNavCollapsed);
         if (viewModel.Tools is not null)
         {
             viewModel.Tools.NotificationRequested += ToolNotificationForwarded;
@@ -149,6 +180,12 @@ public partial class MainWindow : Window, IDisposable, INotifyPropertyChanged
         Loaded += MainWindowLoaded;
     }
 
+    /// <summary>
+    /// 设置页开关本地代理后由宿主调用（P71-01）：刷新助理页第三档的可见性，
+    /// 关闭时若正处于本地代理档则回退只读档。
+    /// </summary>
+    public void RefreshAssistantLocalAgentState() => viewModel.Assistant?.RefreshLocalAgentAvailability();
+
     private async void MainWindowLoaded(object sender, RoutedEventArgs e)
     {
         try
@@ -166,6 +203,19 @@ public partial class MainWindow : Window, IDisposable, INotifyPropertyChanged
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
+    }
+
+    private void NavColumnWidthChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.IsNavCollapsed))
+        {
+            UpdateNavColumnWidth(viewModel.IsNavCollapsed);
+        }
+    }
+
+    private void UpdateNavColumnWidth(bool collapsed)
+    {
+        NavColumn.Width = new GridLength(collapsed ? NavRailWidth : NavExpandedWidth);
     }
 
     private void QuickAddClick(object sender, RoutedEventArgs e)

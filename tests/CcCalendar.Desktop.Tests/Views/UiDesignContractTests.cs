@@ -69,6 +69,28 @@ public sealed class UiDesignContractTests
             StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// P70-06b 主界面收起契约：主导航 rail 化由 IsNavCollapsed 驱动（条目文字
+    /// 隐藏 + rail 工具提示 + 收起/展开按钮），顶部搜索栏由 IsTopSearchCollapsed
+    /// 驱动（收起后原位留搜索图标按钮）。
+    /// </summary>
+    [Fact]
+    public void MainWindowExposesNavRailAndTopSearchCollapseContract()
+    {
+        string mainWindow = ReadWorkspaceFile("src", "CcCalendar.Desktop", "MainWindow.xaml");
+
+        // 主导航 rail：IsNavCollapsed 双态 + 切换按钮。
+        Assert.Contains("IsNavCollapsed", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("收起导航栏", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("展开导航栏", mainWindow, StringComparison.Ordinal);
+        // rail 态条目文字隐藏后靠 ToolTip 补全条目名。
+        Assert.Contains("ToolTip=\"{Binding Label}\"", mainWindow, StringComparison.Ordinal);
+        // 顶部搜索栏：IsTopSearchCollapsed 双态 + 收起/展开按钮。
+        Assert.Contains("IsTopSearchCollapsed", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("收起搜索栏", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("展开搜索栏", mainWindow, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void ToolCenterUsesFocusedCategoriesInsteadOfOneTallCanvas()
     {
@@ -162,6 +184,100 @@ public sealed class UiDesignContractTests
         Assert.Contains("if (!ownsSingleInstanceMutex)", appCode, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// P70-06a 助理页左侧会话栏契约（语义移植 deepseek-harness 侧边栏折叠交互）：
+    /// 左列会话栏（展开 240 / 收起 rail 48）+「新对话」主按钮 + 条目
+    /// （标题 + 相对时间 + hover 删除）+ 空态引导；视觉复用主导航条目样式
+    /// （NavigationItemStyle 的标记条/AccentSubtle 选中底/hover 动画语法）。
+    /// 顶部会话 ComboBox 被会话栏替代。
+    /// </summary>
+    [Fact]
+    public void AssistantShowsSessionsPaneWithCollapseRail()
+    {
+        string assistant = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "AssistantView.xaml");
+
+        // 会话栏结构：新对话主按钮、收起/展开切换（两个状态都可达）、条目数据。
+        Assert.Contains("AutomationProperties.Name=\"新对话\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"收起会话栏\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"展开会话栏\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("ToggleSessionsPaneCommand", assistant, StringComparison.Ordinal);
+        // P73：开合状态由 code-behind 动画驱动，XAML 不再持有 IsSessionsPaneCollapsed
+        // 的 DataTrigger（存在性断言移到下方 code-behind 段）。
+        Assert.Contains("{Binding Sessions}", assistant, StringComparison.Ordinal);
+        // 前缀匹配：XAML 为 SelectedItem="{Binding CurrentSession, Mode=TwoWay}"，
+        // TwoWay 是「点条目切会话」回写 CurrentSession 的前提。
+        Assert.Contains("{Binding CurrentSession", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding RelativeTimeText}", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding HasSessionHistory", assistant, StringComparison.Ordinal);
+        Assert.Contains("DeleteChatCommand", assistant, StringComparison.Ordinal);
+        // 视觉语言与主导航一致：复用 NavigationItemStyle 条目样式（标记条 + 选中底）。
+        Assert.Contains("NavigationItemStyle", assistant, StringComparison.Ordinal);
+        // 空态引导文案。
+        Assert.Contains("暂无历史会话", assistant, StringComparison.Ordinal);
+        // 顶部会话 ComboBox 已被会话栏替代：按旧控件的无障碍名精确排除
+        // （不能断言不含"历史会话"——空态文案"暂无历史会话"天然包含该子串）。
+        Assert.DoesNotContain("AutomationProperties.Name=\"历史会话\"", assistant, StringComparison.Ordinal);
+        Assert.DoesNotContain("切换历史对话", assistant, StringComparison.Ordinal);
+
+        // 列宽切换（240 ↔ 48）在 code-behind 驱动：ColumnDefinition.Width 不是
+        // 可绑定属性，DataTrigger 无法跨模板 Setter 命名列定义。P73 起切换走
+        // GridLengthAnimation 平滑补间（见 AssistantP73…测试）。
+        string codeBehind = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "AssistantView.xaml.cs");
+        Assert.Contains("IsSessionsPaneCollapsed", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinition", codeBehind, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// P73（用户反馈三项）：
+    /// ① 消息流内组件去白底去描边——正文背景非白，图标按钮/胶囊须透明
+    ///    跟随容器底色（IconButtonStyle 透明+无边框、StatPill 去发丝边、
+    ///    复制消息按钮改用 IconButtonStyle）；
+    /// ② 会话面板与主导航之间无缝隙——面板左边距 24→0，直接贴住导航右缘；
+    /// ③ 开合平滑动画——GridLengthAnimation 补间列宽，可见性终态由动画
+    ///    Completed 落定，XAML 不再用 DataTrigger 直跳。
+    /// </summary>
+    [Fact]
+    public void AssistantP73BorderlessChipsSeamlessPaneAndAnimatedCollapse()
+    {
+        string theme = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Themes", "Theme.xaml");
+        string assistant = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "AssistantView.xaml");
+        string codeBehind = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "AssistantView.xaml.cs");
+
+        // ① 图标按钮：透明底 + 无描边。
+        int iconStyleStart = theme.IndexOf("x:Key=\"IconButtonStyle\"", StringComparison.Ordinal);
+        Assert.True(iconStyleStart >= 0);
+        string iconStyle = theme.Substring(iconStyleStart, theme.IndexOf("</Style>", iconStyleStart, StringComparison.Ordinal) - iconStyleStart);
+        Assert.Contains("<Setter Property=\"Background\" Value=\"Transparent\" />", iconStyle, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"BorderThickness\" Value=\"0\" />", iconStyle, StringComparison.Ordinal);
+
+        // ① 统计胶囊：去发丝边（无 BorderBrush setter；模板内的
+        // TemplateBinding 残留无害——Thickness=0 时不再绘制）。
+        int pillStyleStart = theme.IndexOf("x:Key=\"StatPillButtonStyle\"", StringComparison.Ordinal);
+        Assert.True(pillStyleStart >= 0);
+        string pillStyle = theme.Substring(pillStyleStart, theme.IndexOf("</Style>", pillStyleStart, StringComparison.Ordinal) - pillStyleStart);
+        Assert.DoesNotContain("Property=\"BorderBrush\"", pillStyle, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"BorderThickness\" Value=\"0\" />", pillStyle, StringComparison.Ordinal);
+
+        // ① 复制消息按钮改用 IconButtonStyle（不再吃隐式样式的白底描边）。
+        int copyIndex = assistant.IndexOf("AutomationProperties.Name=\"复制消息\"", StringComparison.Ordinal);
+        Assert.True(copyIndex >= 0);
+        string copyRegion = assistant.Substring(copyIndex, Math.Min(300, assistant.Length - copyIndex));
+        Assert.Contains("Style=\"{StaticResource IconButtonStyle}\"", copyRegion, StringComparison.Ordinal);
+
+        // ② 会话面板贴住导航栏与顶栏：左、上边距 0，仅留底部呼吸。
+        Assert.Contains("x:Name=\"SessionsPanel\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"0,0,0,24\"", assistant, StringComparison.Ordinal);
+
+        // ③ 开合动画：补间基建 + code-behind 驱动 + DataTrigger 直跳禁令。
+        Assert.Contains("GridLengthAnimation", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("SetSessionsPaneState", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("PaneAnimationEnabled", codeBehind, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "DataTrigger Binding=\"{Binding IsSessionsPaneCollapsed}\"",
+            assistant,
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public void QuickAddIsShownAsNonModalWindow()
     {
@@ -175,19 +291,105 @@ public sealed class UiDesignContractTests
     }
 
     [Fact]
-    public void AssistantMessagesExposeCollapsibleThinkingBlock()
+    public void AssistantMessagesExposeCollapsibleThinkingRow()
     {
         string assistant = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "AssistantView.xaml");
 
         Assert.Contains("CornerRadius=\"18\"", assistant, StringComparison.Ordinal);
-        Assert.Contains("Header=\"思考\"", assistant, StringComparison.Ordinal);
+        // P70-02：思考块从 Expander + SubtleSurface 背景块改为一行式折叠行
+        // （harness ReasoningRow 语义）：灯泡 + 派生标题 + 旋转 Chevron，整行可点击。
+        Assert.DoesNotContain("<Expander", assistant, StringComparison.Ordinal);
+        Assert.DoesNotContain("Header=\"思考\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding ThinkingTitle}", assistant, StringComparison.Ordinal);
         Assert.Contains("{Binding ThinkingText}", assistant, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"思考过程\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("Kind=\"Lightbulb\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("Kind=\"ChevronDown\"", assistant, StringComparison.Ordinal);
+        // 流式思考中的 shimmer：OpacityMask 三档渐变 + 永续扫光 Storyboard，
+        // 由 IsReasoningStreaming 驱动启停。
+        Assert.Contains("IsReasoningStreaming", assistant, StringComparison.Ordinal);
+        Assert.Contains("ThinkingShimmer", assistant, StringComparison.Ordinal);
+        Assert.Contains("RepeatBehavior=\"Forever\"", assistant, StringComparison.Ordinal);
         Assert.Contains("IsReadOnly=\"True\"", assistant, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Text, Mode=OneWay}\"", assistant, StringComparison.Ordinal);
         Assert.Contains("Click=\"CopyMessageClick\"", assistant, StringComparison.Ordinal);
-        Assert.Contains("Value=\"AI\"", assistant, StringComparison.Ordinal);
+        // P70-01：消息形态改为聊天客户端形态。用户消息是右对齐气泡
+        // （BubbleBrush 底 + RadiusBubble 圆角 + 上下10左右16 内边距），
+        // 头像/名称行（"AI"/"你"字样）随评论区形态一并移除。
+        Assert.Contains("Background=\"{DynamicResource BubbleBrush}\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("CornerRadius=\"{StaticResource RadiusBubble}\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("Padding=\"16,10\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Right\"", assistant, StringComparison.Ordinal);
+        Assert.DoesNotContain("Value=\"AI\"", assistant, StringComparison.Ordinal);
+        Assert.DoesNotContain("Value=\"你\"", assistant, StringComparison.Ordinal);
         Assert.DoesNotContain("ThinkEnabled", assistant, StringComparison.Ordinal);
         Assert.DoesNotContain("DeepSearchEnabled", assistant, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// P70-05 工具调用行契约（语义移植 deepseek-harness ToolRow）：
+    /// 消息模板第三个分支（IsToolCall 触发器）= 8px 状态点
+    /// （Running=呼吸动画 / Ok=SuccessBrush / Error=DangerBrush）
+    /// + 工具中文名 + 参数摘要 + 旋转 Chevron；展开区是等宽 ToolDetail。
+    /// </summary>
+    [Fact]
+    public void AssistantMessagesExposeToolCallRow()
+    {
+        string assistant = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "AssistantView.xaml");
+
+        // 第三个分支由 IsToolCall 数据触发器驱动。
+        Assert.Contains("IsToolCall", assistant, StringComparison.Ordinal);
+        Assert.Contains(
+            "AutomationProperties.Name=\"{Binding ToolDisplayName}\"",
+            assistant,
+            StringComparison.Ordinal);
+        Assert.Contains("{Binding ToolDisplayName}", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding ToolSummary}", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding ToolDetail}", assistant, StringComparison.Ordinal);
+        // 状态点：Ellipse + Running 呼吸动画 + Ok/Error 语义画刷换色。
+        Assert.Contains("ToolStateDot", assistant, StringComparison.Ordinal);
+        Assert.Contains("ToolRunningPulse", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding ToolState}", assistant, StringComparison.Ordinal);
+        Assert.Contains("SuccessBrush", assistant, StringComparison.Ordinal);
+        Assert.Contains("DangerBrush", assistant, StringComparison.Ordinal);
+        // 展开区：等宽字体（与统计弹窗同一字体栈）+ SubtleSurface 底。
+        Assert.Contains("FontFamily=\"Cascadia Mono, Microsoft YaHei UI\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("SubtleSurfaceBrush", assistant, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// P70-04 统计胶囊契约（语义移植 deepseek-harness StatsPills）：
+    /// composer 按钮行正下方有两枚胶囊（会话统计 / Token 用量），各有 Popup 详情；
+    /// 助手消息尾部有轮次用量胶囊（Usage 为空时隐藏）。
+    /// Q5 裁决：只显示 tokens，不做成本/金额。
+    /// </summary>
+    [Fact]
+    public void AssistantComposerShowsStatsPillsWithDetailPopups()
+    {
+        string assistant = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "AssistantView.xaml");
+
+        Assert.Contains("AutomationProperties.Name=\"会话统计\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"Token 用量\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding SessionStatsSummary}", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding TokenStatsSummary}", assistant, StringComparison.Ordinal);
+        // 整行胶囊由 HasUsageData 控制可见性：无用量数据不占位。
+        Assert.Contains("HasUsageData", assistant, StringComparison.Ordinal);
+        Assert.Contains("Kind=\"Database\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("StatPillButtonStyle", assistant, StringComparison.Ordinal);
+        // 两枚胶囊各带一个 Popup 详情（StaysOpen=False 点击外部关闭）。
+        Assert.Contains("StaysOpen=\"False\"", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding SessionStatRows}", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding TokenStatRows}", assistant, StringComparison.Ordinal);
+        // 助手消息尾部的轮次用量胶囊。
+        Assert.Contains("{Binding UsageSummary}", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding UsageDetail}", assistant, StringComparison.Ordinal);
+        Assert.Contains("{Binding HasUsage,", assistant, StringComparison.Ordinal);
+
+        // 胶囊样式在主题里集中声明；只显示 tokens，不出现金额/成本字样（Q5 裁决）。
+        string theme = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Themes", "Theme.xaml");
+        Assert.Contains("x:Key=\"StatPillButtonStyle\"", theme, StringComparison.Ordinal);
+        Assert.DoesNotContain("¥", assistant, StringComparison.Ordinal);
+        Assert.DoesNotContain("$", assistant, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -431,7 +633,87 @@ public sealed class UiDesignContractTests
         string assistantView = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "AssistantView.xaml");
 
         Assert.Contains("x:Name=\"AssistantCommandBar\"", assistantView, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"AssistantContextBar\"", assistantView, StringComparison.Ordinal);
+        // P72：模型/权限从顶部 ContextBar 收敛为 composer 工具行芯片
+        // （加号右侧权限下拉 + 右下模型菜单），声明位置在消息列表之后，顶部只留命令按钮。
+        Assert.DoesNotContain("x:Name=\"AssistantContextBar\"", assistantView, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PermissionChip\"", assistantView, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ModelChip\"", assistantView, StringComparison.Ordinal);
+        Assert.True(
+            assistantView.IndexOf("x:Name=\"PermissionChip\"", StringComparison.Ordinal)
+                > assistantView.IndexOf("x:Name=\"MessageList\"", StringComparison.Ordinal),
+            "权限芯片应位于 composer 工具行（消息列表声明之后），不再占顶部一行。");
+    }
+
+    /// <summary>
+    /// P70-07 Composer 精化契约：发送/停止合并为单按钮（Style 触发器切换
+    /// Command/自动化名/Danger 底）、错误行（IsError 第四分支 + DangerBrush 红点 +
+    /// 标题/消息/等宽错误码绑定）、附件文件卡（定宽 240 + KB meta 转换器 + 移除按钮）。
+    /// </summary>
+    [Fact]
+    public void AssistantComposerMergesSendStopAndShowsErrorRowAndFileCards()
+    {
+        string assistantView = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "AssistantView.xaml");
+
+        // 单按钮两态：默认 SendCommand，IsSending 触发器切 StopCommand + 停止名 + Danger 底。
+        Assert.Contains("x:Name=\"SendStopButton\"", assistantView, StringComparison.Ordinal);
+        Assert.Contains("Value=\"{Binding SendCommand}\"", assistantView, StringComparison.Ordinal);
+        Assert.Contains("Value=\"{Binding StopCommand}\"", assistantView, StringComparison.Ordinal);
+        Assert.Contains("Binding IsSending", assistantView, StringComparison.Ordinal);
+        Assert.Contains("Value=\"停止请求\"", assistantView, StringComparison.Ordinal);
+        Assert.Contains("Value=\"发送\"", assistantView, StringComparison.Ordinal);
+        // 旧并排双按钮移除：发送/停止不再以独立按钮的属性绑定形式出现。
+        Assert.DoesNotContain("Command=\"{Binding SendCommand}\"", assistantView, StringComparison.Ordinal);
+        Assert.DoesNotContain("Command=\"{Binding StopCommand}\"", assistantView, StringComparison.Ordinal);
+
+        // 错误行：IsError 分支 + 红点 + 标题/消息/错误码绑定 + Danger 画刷。
+        Assert.Contains("Binding IsError", assistantView, StringComparison.Ordinal);
+        Assert.Contains("{Binding ErrorTitle}", assistantView, StringComparison.Ordinal);
+        Assert.Contains("{Binding ErrorMessage}", assistantView, StringComparison.Ordinal);
+        Assert.Contains("{Binding ErrorCode}", assistantView, StringComparison.Ordinal);
+        Assert.Contains("Fill=\"{DynamicResource DangerBrush}\"", assistantView, StringComparison.Ordinal);
+
+        // 文件卡：定宽 240 + 移除附件 + KB meta 转换器。
+        Assert.Contains("Width=\"240\"", assistantView, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"移除附件\"", assistantView, StringComparison.Ordinal);
+        Assert.Contains("FileSizeTextConverter", assistantView, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// P72（用户裁决）：消息区与输入卡均全幅铺开，不套 harness 的居中
+    /// 宽度轴；用户气泡右对齐贴齐列表右缘，上限 = 列表宽 × 0.7
+    /// （源绑 ListBox.ActualWidth，独立布局输出）。
+    /// 气泡宽度禁止绑 MessageRoot（ActualWidth/MaxWidth 均为循环依赖，
+    /// P72 事故：气泡卡死 0 宽、提问不显示）。
+    /// </summary>
+    [Fact]
+    public void AssistantUserBubbleAlignsRightAndComposerSpansFullWidth()
+    {
+        string assistantView = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "AssistantView.xaml");
+        string appXaml = ReadWorkspaceFile("src", "CcCalendar.Desktop", "App.xaml");
+
+        // 用户气泡：右对齐 + 列表宽 × 0.7 上限（独立源 ListBox.ActualWidth）。
+        Assert.Contains(
+            "MaxWidth=\"{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ListBox}, Converter={StaticResource ScaleClampConverter}, ConverterParameter='0.7'}\"",
+            assistantView,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Background=\"{DynamicResource BubbleBrush}\"",
+            assistantView,
+            StringComparison.Ordinal);
+        // 循环依赖禁令：不得绑模板根 MessageRoot 的任何宽度属性。
+        Assert.DoesNotContain(
+            "ElementName=MessageRoot",
+            assistantView,
+            StringComparison.Ordinal);
+        // 全幅裁决：居中宽度轴（clamp 参数）不得回流消息列或输入卡。
+        Assert.DoesNotContain(
+            "ConverterParameter='0.64;680;920",
+            assistantView,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ScaleClampConverter x:Key=\"ScaleClampConverter\"",
+            appXaml,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -440,7 +722,9 @@ public sealed class UiDesignContractTests
         string assistantView = ReadWorkspaceFile("src", "CcCalendar.Desktop", "Views", "AssistantView.xaml");
 
         Assert.Contains("AutomationProperties.Name=\"复制消息\"", assistantView, StringComparison.Ordinal);
-        Assert.Contains("AutomationProperties.Name=\"停止请求\"", assistantView, StringComparison.Ordinal);
+        // P70-07：停止请求名随发送/停止合并移入单按钮的 Style 切换值
+        // （见 AssistantComposerMergesSendStopAndShowsErrorRowAndFileCards）。
+        Assert.Contains("AutomationProperties.Name=\"移除附件\"", assistantView, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"确认创建提案\"", assistantView, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"确认变更提案\"", assistantView, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"寻找空闲时间\"", assistantView, StringComparison.Ordinal);

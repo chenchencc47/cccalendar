@@ -70,6 +70,7 @@ internal static class WpfRuntimeHost
             });
             app.Resources["EnumEqualsConverter"] = new EnumEqualsConverter();
             app.Resources["ColorStringToBrushConverter"] = new ColorStringToBrushConverter();
+            app.Resources["ScaleClampConverter"] = new ScaleClampConverter();
         }
 
         foreach (Action work in Work.GetConsumingEnumerable())

@@ -1,7 +1,7 @@
 {
     "mandatory": false,
-    "version": "0.6.8",
-    "releaseNotes": "0.6.8 更新内容：\n\n- 修复设置页「应用更新」处版本号显示不更新的问题：更新后仍显示旧版本号（如 0.6.5）。\n- 修复「查看更新内容」显示的是旧版本说明的问题；更新说明改为随版本自动获取。\n\n说明：0.6.7 已包含界面观感与动效改版（深色看板、控件过渡动效、卡片阴影分层、新增加载环与状态点、字号与留白统一）。若你尚未安装 0.6.7，本次 0.6.8 一并包含全部内容。",
-    "sha256": "1155320909E21183A3F1AFE70ACE5F40F5B1B23F01A94F0AC477A9D39155CBDF",
-    "url": "https://cccalendar-releases-01.oss-cn-heyuan.aliyuncs.com/releases/0.6.8/cccalendar-0.6.8-win-x64-setup.exe"
+    "version": "0.8.0",
+    "releaseNotes": "0.8.0 更新内容：\n\n- 模型目录补上下文窗口元数据：设置 → AI 模型可为每个模型填写上下文窗口大小，供上下文统计使用。\n- 助理页 token 构成分段条：输入框下方统计行升级为分段条与图例，按系统提示、用户消息、模型回复、工具结果分段展示当前上下文构成，并显示上下文窗口占用进度。\n- 视觉桥：助理支持附加图片（png/jpg/jpeg/webp/gif，单文件 4MB、合计 8MB），发送前经视觉转写模型转写为文字再交给主模型分析；需在设置 → AI 模型中配置 OpenAI 兼容视觉端点并选定视觉转写模型，转写过程以工具行展示。",
+    "sha256": "4FF2C633C854FF0AF172D8A4105D35717ADCCC7C9FA754FBDEDE1C1EB48C9310",
+    "url": "https://cccalendar-releases-01.oss-cn-heyuan.aliyuncs.com/releases/0.8.0/cccalendar-0.8.0-win-x64-setup.exe"
 }

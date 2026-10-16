@@ -30,6 +30,37 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("项目", viewModel.SelectedPageTitle);
     }
 
+    /// <summary>
+    /// P70-06b：主导航 rail 化与顶部搜索栏收起的 VM 行为——构造接收初始收起状态，
+    /// 命令切换双态，且每次变化通过回调写回（供宿主持久化到设置）。
+    /// </summary>
+    [Fact]
+    public void NavAndTopSearchCollapseToggleAndWriteBack()
+    {
+        bool? navCollapsed = null;
+        bool? searchCollapsed = null;
+        var viewModel = new MainWindowViewModel(
+            TimeProvider.System,
+            mainNavCollapsed: true,
+            mainNavCollapsedChanged: value => navCollapsed = value,
+            topSearchCollapsed: false,
+            topSearchCollapsedChanged: value => searchCollapsed = value);
+
+        // 初始值来自构造参数（设置里的持久化状态）。
+        Assert.True(viewModel.IsNavCollapsed);
+        Assert.False(viewModel.IsTopSearchCollapsed);
+
+        // 切换主导航：收起 → 展开，回调收到 false。
+        viewModel.ToggleNavCommand.Execute(null);
+        Assert.False(viewModel.IsNavCollapsed);
+        Assert.False(navCollapsed);
+
+        // 切换搜索栏：展开 → 收起，回调收到 true。
+        viewModel.ToggleTopSearchCommand.Execute(null);
+        Assert.True(viewModel.IsTopSearchCollapsed);
+        Assert.True(searchCollapsed);
+    }
+
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;

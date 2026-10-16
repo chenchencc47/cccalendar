@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using CcCalendar.Core.AI;
 using CcCalendar.Core.Configuration;
@@ -51,6 +52,53 @@ public sealed class ProviderAiAssistantClientTests
 
         Assert.Equal(["找到", "发布待办。"], deltas);
         Assert.Contains("\"stream\":true", handler.Requests[0].Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamingEmitsContextCompositionBeforeDeltas()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            data: {"choices":[{"delta":{"content":"好的"}}]}
+
+            data: [DONE]
+
+            """],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+        var client = CreateClient(database, handler, settings);
+        var updates = new List<AiAssistantUpdate>();
+
+        await client.StreamAsync(
+            new AiAssistantRequest(
+                "查找发布待办",
+                AiAssistantMode.ReadOnly,
+                [new AiAssistantTurn(false, "上一轮回答")]),
+            (update, _) =>
+            {
+                updates.Add(update);
+                return Task.CompletedTask;
+            },
+            CancellationToken.None);
+
+        // P74-02：构成事件必须是首个 update，随后才是文本分片。
+        Assert.IsType<AiContextCompositionUpdate>(updates[0]);
+        var composition = (AiContextCompositionUpdate)updates[0];
+        Assert.True(composition.SystemTokens > 0);
+        Assert.True(composition.ToolSchemaTokens > 0);
+        Assert.Equal(
+            AiTokenEstimator.EstimateTokens("查找发布待办"),
+            composition.UserTokens);
+        Assert.Equal(
+            AiTokenEstimator.EstimateTokens("上一轮回答"),
+            composition.AssistantTokens);
+        Assert.Contains(updates, update => update is AiTextDelta { Text: "好的" });
     }
 
     [Fact]
@@ -215,6 +263,402 @@ public sealed class ProviderAiAssistantClientTests
         Assert.Equal(
             ["找到", "发布待办。"],
             await StreamTextAsync(CreateClient(database, handler, settings)));
+    }
+
+    [Fact]
+    public async Task OpenAiChatStreamEmitsUsageWithCachedAndReasoningTokens()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            data: {"choices":[{"delta":{"content":"找到"}}]}
+
+            data: {"model":"gpt-test","choices":[],"usage":{"prompt_tokens":100,"completion_tokens":40,"prompt_tokens_details":{"cached_tokens":60},"completion_tokens_details":{"reasoning_tokens":12}}}
+
+            data: [DONE]
+
+            """],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+
+        AiUsageUpdate usage = Assert.Single(
+            await StreamUsageAsync(CreateClient(database, handler, settings)));
+
+        Assert.Equal(100, usage.PromptTokens);
+        Assert.Equal(40, usage.CompletionTokens);
+        Assert.Equal(60, usage.CachedPromptTokens);
+        Assert.Null(usage.CacheWriteTokens);
+        Assert.Equal(12, usage.ReasoningTokens);
+        Assert.Equal("gpt-test", usage.Model);
+        Assert.Contains(
+            "\"stream_options\":{\"include_usage\":true}",
+            handler.Requests[0].Body,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DeepSeekStreamUsageMapsPromptCacheHitTokens()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            data: {"model":"deepseek-chat","choices":[],"usage":{"prompt_tokens":210,"completion_tokens":35,"prompt_cache_hit_tokens":192}}
+
+            data: [DONE]
+
+            """],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.deepseek.test/v1",
+            Model = "deepseek-chat",
+        };
+
+        AiUsageUpdate usage = Assert.Single(
+            await StreamUsageAsync(CreateClient(database, handler, settings)));
+
+        Assert.Equal(210, usage.PromptTokens);
+        Assert.Equal(35, usage.CompletionTokens);
+        Assert.Equal(192, usage.CachedPromptTokens);
+        Assert.Null(usage.ReasoningTokens);
+        Assert.Contains(
+            "\"stream_options\":{\"include_usage\":true}",
+            handler.Requests[0].Body,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OpenAiChatStreamWithoutUsageStaysSilent()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            data: {"choices":[{"delta":{"content":"找到"}}]}
+
+            data: [DONE]
+
+            """],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+
+        Assert.Empty(await StreamUsageAsync(CreateClient(database, handler, settings)));
+        // 网关忽略 include_usage 时请求仍带 stream_options，只是流里不回 usage。
+        Assert.Contains(
+            "\"stream_options\":{\"include_usage\":true}",
+            handler.Requests[0].Body,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OpenAiChatToolLoopEmitsUsagePerRound()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            [
+                """
+                data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"query_todos","arguments":"{\"query\":\"release\",\"limit\":5}"}}]}}]}
+
+                data: {"choices":[],"usage":{"prompt_tokens":100,"completion_tokens":10}}
+
+                data: [DONE]
+
+                """,
+                """
+                data: {"choices":[{"delta":{"content":"找到发布待办。"}}]}
+
+                data: {"choices":[],"usage":{"prompt_tokens":80,"completion_tokens":20,"prompt_cache_hit_tokens":50}}
+
+                data: [DONE]
+
+                """,
+            ],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+
+        List<AiUsageUpdate> usage = await StreamUsageAsync(
+            CreateClient(database, handler, settings));
+
+        Assert.Equal(2, usage.Count);
+        Assert.Equal(10, usage[0].CompletionTokens);
+        Assert.Null(usage[0].CachedPromptTokens);
+        Assert.Equal(50, usage[1].CachedPromptTokens);
+    }
+
+    /// <summary>
+    /// P70-05：工具循环对每次工具调用发 Running→Ok 事件（带参数/结果摘要），
+    /// 事件先于下一轮请求发出。
+    /// </summary>
+    [Fact]
+    public async Task OpenAiChatToolLoopEmitsToolCallRunningThenOk()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            [
+                """
+                data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"query_todos","arguments":"{\"query\":\"release\",\"limit\":5}"}}]}}]}
+
+                data: [DONE]
+
+                """,
+                """
+                data: {"choices":[{"delta":{"content":"找到发布待办。"}}]}
+
+                data: [DONE]
+
+                """,
+            ],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+
+        List<AiToolCallUpdate> toolCalls = await StreamToolCallsAsync(
+            CreateClient(database, handler, settings));
+
+        Assert.Equal(2, toolCalls.Count);
+        Assert.All(toolCalls, update => Assert.Equal("query_todos", update.ToolName));
+        Assert.Equal(AiToolCallState.Running, toolCalls[0].State);
+        // 参数摘要：前两个键值拼接，能认出模型在查什么。
+        Assert.Contains("release", toolCalls[0].ArgsSummary, StringComparison.Ordinal);
+        Assert.Null(toolCalls[0].ResultSummary);
+        Assert.Equal(AiToolCallState.Ok, toolCalls[1].State);
+        // 结果摘要：查询工具回 JSON，摘要非空（截断规则见 SummarizeToolResult）。
+        Assert.False(string.IsNullOrWhiteSpace(toolCalls[1].ResultSummary));
+    }
+
+    /// <summary>
+    /// P70-05：工具执行抛异常时发 Running→Error（异常消息作 ResultSummary），
+    /// 且原异常原样上抛——既有错误处理流不被破坏。
+    /// </summary>
+    [Fact]
+    public async Task ToolLoopEmitsErrorEventAndRethrowsWhenToolFails()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            [
+                """
+                data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"propose_todo","arguments":"{\"title\":\"幻觉调用\",\"dueAt\":null}"}}]}}]}
+
+                data: [DONE]
+
+                """,
+            ],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+        ProviderAiAssistantClient client = CreateClient(database, handler, settings);
+        var toolCalls = new List<AiToolCallUpdate>();
+
+        // 只读模式下模型幻觉调用写入工具：ExecuteToolAsync 抛 InvalidOperationException。
+        InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.StreamAsync(
+                new AiAssistantRequest("只读模式下的幻觉调用", AiAssistantMode.ReadOnly),
+                (update, _) =>
+                {
+                    if (update is AiToolCallUpdate toolCall)
+                    {
+                        toolCalls.Add(toolCall);
+                    }
+
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None));
+
+        Assert.Equal("只读模式不允许写入提案工具。", exception.Message);
+        Assert.Equal(2, toolCalls.Count);
+        Assert.Equal(AiToolCallState.Running, toolCalls[0].State);
+        Assert.Equal(AiToolCallState.Error, toolCalls[1].State);
+        Assert.Equal("只读模式不允许写入提案工具。", toolCalls[1].ResultSummary);
+    }
+
+    [Fact]
+    public async Task AnthropicStreamMergesUsageFromMessageStartAndDelta()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1","model":"claude-test","usage":{"input_tokens":25,"cache_read_input_tokens":10,"cache_creation_input_tokens":5,"output_tokens":2}}}
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"找到"}}
+
+            event: message_delta
+            data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":37}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+
+            """],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.Anthropic,
+            Endpoint = "https://api.anthropic.test/v1",
+            Model = "claude-test",
+        };
+
+        AiUsageUpdate usage = Assert.Single(
+            await StreamUsageAsync(CreateClient(database, handler, settings)));
+
+        Assert.Equal(25, usage.PromptTokens);
+        Assert.Equal(37, usage.CompletionTokens);
+        Assert.Equal(10, usage.CachedPromptTokens);
+        Assert.Equal(5, usage.CacheWriteTokens);
+        Assert.Equal("claude-test", usage.Model);
+    }
+
+    [Fact]
+    public async Task AnthropicStreamWithoutUsageStaysSilent()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg_1"}}
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"找到"}}
+
+            event: message_delta
+            data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+
+            """],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.Anthropic,
+            Endpoint = "https://api.anthropic.test/v1",
+            Model = "claude-test",
+        };
+
+        Assert.Empty(await StreamUsageAsync(CreateClient(database, handler, settings)));
+    }
+
+    [Fact]
+    public async Task ResponsesCompletedUsageParsesTokenDetails()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            event: response.output_text.delta
+            data: {"type":"response.output_text.delta","delta":"找到"}
+
+            event: response.completed
+            data: {"type":"response.completed","response":{"id":"resp_1","model":"gpt-test","output":[],"usage":{"input_tokens":80,"output_tokens":30,"input_tokens_details":{"cached_tokens":50},"output_tokens_details":{"reasoning_tokens":7}}}}
+
+            """],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiResponses,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+
+        AiUsageUpdate usage = Assert.Single(
+            await StreamUsageAsync(CreateClient(database, handler, settings)));
+
+        Assert.Equal(80, usage.PromptTokens);
+        Assert.Equal(30, usage.CompletionTokens);
+        Assert.Equal(50, usage.CachedPromptTokens);
+        Assert.Equal(7, usage.ReasoningTokens);
+        Assert.Equal("gpt-test", usage.Model);
+    }
+
+    [Fact]
+    public async Task ResponsesCompletedWithoutUsageStaysSilent()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            event: response.completed
+            data: {"type":"response.completed","response":{"id":"resp_1","output":[]}}
+
+            """],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiResponses,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+
+        Assert.Empty(await StreamUsageAsync(CreateClient(database, handler, settings)));
+    }
+
+    [Fact]
+    public async Task OllamaStreamEmitsFinalChunkCounts()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            {"model":"qwen-test","message":{"role":"assistant","content":"找到"},"done":false}
+            {"model":"qwen-test","message":{"role":"assistant","content":""},"done":true,"prompt_eval_count":26,"eval_count":298}
+            """],
+            "application/x-ndjson");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.Ollama,
+            Endpoint = "http://localhost:11434",
+            Model = "qwen-test",
+            LocalOnlyMode = true,
+        };
+
+        AiUsageUpdate usage = Assert.Single(
+            await StreamUsageAsync(CreateClient(database, handler, settings)));
+
+        Assert.Equal(26, usage.PromptTokens);
+        Assert.Equal(298, usage.CompletionTokens);
+        Assert.Null(usage.CachedPromptTokens);
+        Assert.Equal("qwen-test", usage.Model);
+    }
+
+    [Fact]
+    public async Task OllamaStreamWithoutCountsStaysSilent()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            {"message":{"role":"assistant","content":"找到"},"done":false}
+            {"message":{"role":"assistant","content":""},"done":true}
+            """],
+            "application/x-ndjson");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.Ollama,
+            Endpoint = "http://localhost:11434",
+            Model = "qwen-test",
+            LocalOnlyMode = true,
+        };
+
+        Assert.Empty(await StreamUsageAsync(CreateClient(database, handler, settings)));
     }
 
     [Fact]
@@ -754,6 +1198,866 @@ public sealed class ProviderAiAssistantClientTests
         Assert.Contains("Authentication Fails", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task LocalAgentModeIncludesCatalogFilteredByToolSwitches()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            data: {"choices":[{"delta":{"content":"好的"}}]}
+
+            data: [DONE]
+
+            """],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+
+        await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+        {
+            Enabled = true,
+            AllowReadFile = true,
+            AllowListDirectory = true,
+            AllowSearchFiles = true,
+            AllowWriteFile = false,
+            AllowRunCommand = false,
+        }).StreamAsync(
+            new AiAssistantRequest("帮我看看本地文件", AiAssistantMode.LocalAgent),
+            (_, _) => Task.CompletedTask,
+            CancellationToken.None);
+
+        string body = handler.Requests[0].Body;
+        // 本地代理 = 查询 + 提案 + 只读三件套；写入两件套被开关关掉不得进入目录。
+        // 按工具定义的 "name":"..." 键断言——系统指令文本里也提到工具名，
+        // 直接 Contains 工具名会误伤。
+        Assert.Contains("\"name\":\"query_events\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"name\":\"propose_timed_event\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"name\":\"read_file\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"name\":\"list_directory\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"name\":\"search_files\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"name\":\"write_file\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"name\":\"run_command\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LocalAgentModeIncludesWriteToolsWhenSwitchesEnabled()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            data: {"choices":[{"delta":{"content":"好的"}}]}
+
+            data: [DONE]
+
+            """],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+
+        await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+        {
+            Enabled = true,
+            AllowWriteFile = true,
+            AllowRunCommand = true,
+        }).StreamAsync(
+            new AiAssistantRequest("帮我写文件", AiAssistantMode.LocalAgent),
+            (_, _) => Task.CompletedTask,
+            CancellationToken.None);
+
+        string body = handler.Requests[0].Body;
+        Assert.Contains("\"name\":\"write_file\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"name\":\"run_command\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LocalAgentModeRejectedWhenSettingMissingOrDisabled()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            ["""
+            data: {"choices":[{"delta":{"content":"好的"}}]}
+
+            data: [DONE]
+
+            """],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+
+        // 未接线（null）：宿主未提供本地代理设置。
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => CreateClient(database, handler, settings).StreamAsync(
+                new AiAssistantRequest("本地代理", AiAssistantMode.LocalAgent),
+                (_, _) => Task.CompletedTask,
+                CancellationToken.None));
+        // 已接线但 Enabled=false：设置页未开启。
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+            {
+                Enabled = false,
+            }).StreamAsync(
+                new AiAssistantRequest("本地代理", AiAssistantMode.LocalAgent),
+                (_, _) => Task.CompletedTask,
+                CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task LocalAgentModeExecutesLocalToolAndFeedsResultBack()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        string tempFile = Path.Combine(Path.GetTempPath(), "cccalendar-agent-round-" + Guid.NewGuid().ToString("N") + ".txt");
+        // 内容用 ASCII 标记：System.Text.Json 默认 encoder 会把非 ASCII 转义为 \uXXXX，
+        // 断言 body.Contains(中文) 会误判失败。
+        await File.WriteAllTextAsync(tempFile, "local-agent-roundtrip-ok");
+        try
+        {
+            // 参数里的 Windows 路径用正斜杠表示，避免 SSE JSON 双层转义出错；
+            // .NET 文件 API 对正斜杠路径同样有效。SSE 行用 JsonNode 程序化构造，
+            // 规避内插原始字符串的大括号转义计数问题。
+            string forwardSlashPath = tempFile.Replace('\\', '/');
+            string arguments = JsonSerializer.Serialize(
+                new Dictionary<string, string> { ["path"] = forwardSlashPath });
+            string firstData = new JsonObject
+            {
+                ["choices"] = new JsonArray
+                {
+                    new JsonObject
+                    {
+                        ["delta"] = new JsonObject
+                        {
+                            ["tool_calls"] = new JsonArray
+                            {
+                                new JsonObject
+                                {
+                                    ["index"] = 0,
+                                    ["id"] = "call_1",
+                                    ["function"] = new JsonObject
+                                    {
+                                        ["name"] = "read_file",
+                                        ["arguments"] = arguments,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            }.ToJsonString();
+            var handler = new QueueHttpMessageHandler(
+            [
+                $"data: {firstData}\n\ndata: [DONE]\n\n",
+                """
+                data: {"choices":[{"delta":{"content":"读到了。"}}]}
+
+                data: [DONE]
+
+                """,
+            ],
+            "text/event-stream");
+            var settings = new AiProviderSettings
+            {
+                Provider = AiProviderKind.OpenAiCompatible,
+                Endpoint = "https://api.openai.test/v1",
+                Model = "gpt-test",
+            };
+            var toolCalls = new List<AiToolCallUpdate>();
+
+            await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+            {
+                Enabled = true,
+            }).StreamAsync(
+                new AiAssistantRequest("读取该文件", AiAssistantMode.LocalAgent),
+                (update, _) =>
+                {
+                    if (update is AiToolCallUpdate toolCall)
+                    {
+                        toolCalls.Add(toolCall);
+                    }
+
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None);
+
+            // 工具行事件：Running → Ok（P70-05 通道，本地工具走同一链路）。
+            Assert.Equal(
+                [AiToolCallState.Running, AiToolCallState.Ok],
+                toolCalls.Select(toolCall => toolCall.State));
+            // 工具结果回传给模型的第二轮请求里应包含读到的内容。
+            Assert.Contains("local-agent-roundtrip-ok", handler.Requests[1].Body, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task LocalAgentModeAllowsProposalTools()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            [
+                """
+                data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"propose_todo","arguments":"{\"title\":\"本地代理提案\",\"dueAt\":null}"}}]}}]}
+
+                data: [DONE]
+
+                """,
+                """
+                data: {"choices":[{"delta":{"content":"已生成提案。"}}]}
+
+                data: [DONE]
+
+                """,
+            ],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+        var proposals = new List<AiAssistantProposal>();
+
+        await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+        {
+            Enabled = true,
+        }).StreamAsync(
+            new AiAssistantRequest("建个待办", AiAssistantMode.LocalAgent),
+            (update, _) =>
+            {
+                if (update is AiProposalUpdate proposal)
+                {
+                    proposals.Add(proposal.Proposal);
+                }
+
+                return Task.CompletedTask;
+            },
+            CancellationToken.None);
+
+        AiCreationAssistantProposal creation = Assert.IsType<AiCreationAssistantProposal>(
+            Assert.Single(proposals));
+        Assert.Equal("本地代理提案", creation.Draft.Title);
+    }
+
+    [Fact]
+    public async Task LocalAgentWriteToolExecutesAfterApprovalAllowOnce()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        string tempFile = Path.Combine(Path.GetTempPath(), "cccalendar-approval-" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            var handler = new QueueHttpMessageHandler(
+                [CreateWriteFileSse(tempFile, "approval-roundtrip-ok"), CreateTextSse("written")],
+                "text/event-stream");
+            var settings = new AiProviderSettings
+            {
+                Provider = AiProviderKind.OpenAiCompatible,
+                Endpoint = "https://api.openai.test/v1",
+                Model = "gpt-test",
+            };
+            var toolCalls = new List<AiToolCallUpdate>();
+            string? approvedTool = null;
+
+            await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+            {
+                Enabled = true,
+                AllowWriteFile = true,
+            }).StreamAsync(
+                new AiAssistantRequest(
+                    "写文件",
+                    AiAssistantMode.LocalAgent,
+                    toolApproval: (approval, _) =>
+                    {
+                        approvedTool = approval.ToolName;
+                        return Task.FromResult(AiToolApprovalDecision.AllowOnce);
+                    }),
+                (update, _) =>
+                {
+                    if (update is AiToolCallUpdate toolCall)
+                    {
+                        toolCalls.Add(toolCall);
+                    }
+
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None);
+
+            // 审批回调收到工具名；事件序：先审（PendingApproval）后跑（Running → Ok）。
+            Assert.Equal("write_file", approvedTool);
+            Assert.Equal(
+                [AiToolCallState.PendingApproval, AiToolCallState.Running, AiToolCallState.Ok],
+                toolCalls.Select(toolCall => toolCall.State));
+            Assert.True(File.Exists(tempFile));
+            Assert.Equal("approval-roundtrip-ok", await File.ReadAllTextAsync(tempFile));
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task LocalAgentWriteToolDeniedByUserDecision()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        string tempFile = Path.Combine(Path.GetTempPath(), "cccalendar-approval-" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            var handler = new QueueHttpMessageHandler(
+                [CreateWriteFileSse(tempFile, "denied-marker"), CreateTextSse("ok")],
+                "text/event-stream");
+            var settings = new AiProviderSettings
+            {
+                Provider = AiProviderKind.OpenAiCompatible,
+                Endpoint = "https://api.openai.test/v1",
+                Model = "gpt-test",
+            };
+            var toolCalls = new List<AiToolCallUpdate>();
+
+            await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+            {
+                Enabled = true,
+                AllowWriteFile = true,
+            }).StreamAsync(
+                new AiAssistantRequest(
+                    "写文件",
+                    AiAssistantMode.LocalAgent,
+                    toolApproval: (_, _) => Task.FromResult(AiToolApprovalDecision.Deny)),
+                (update, _) =>
+                {
+                    if (update is AiToolCallUpdate toolCall)
+                    {
+                        toolCalls.Add(toolCall);
+                    }
+
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None);
+
+            // 拒绝：PendingApproval → Error，文件未写，error 结果回传模型继续对话。
+            Assert.Equal(
+                [AiToolCallState.PendingApproval, AiToolCallState.Error],
+                toolCalls.Select(toolCall => toolCall.State));
+            Assert.Equal("用户已拒绝", toolCalls[1].ResultSummary);
+            Assert.False(File.Exists(tempFile));
+            Assert.Equal(2, handler.Requests.Count);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task LocalAgentWriteToolDeniedWhenApprovalCallbackMissing()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        string tempFile = Path.Combine(Path.GetTempPath(), "cccalendar-approval-" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            var handler = new QueueHttpMessageHandler(
+                [CreateWriteFileSse(tempFile, "no-callback-marker"), CreateTextSse("ok")],
+                "text/event-stream");
+            var settings = new AiProviderSettings
+            {
+                Provider = AiProviderKind.OpenAiCompatible,
+                Endpoint = "https://api.openai.test/v1",
+                Model = "gpt-test",
+            };
+            var toolCalls = new List<AiToolCallUpdate>();
+
+            // 未接审批回调（测试宿主/旧调用方）：安全默认拒绝，不静默执行写操作。
+            await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+            {
+                Enabled = true,
+                AllowWriteFile = true,
+            }).StreamAsync(
+                new AiAssistantRequest("写文件", AiAssistantMode.LocalAgent),
+                (update, _) =>
+                {
+                    if (update is AiToolCallUpdate toolCall)
+                    {
+                        toolCalls.Add(toolCall);
+                    }
+
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None);
+
+            Assert.Equal(
+                [AiToolCallState.PendingApproval, AiToolCallState.Error],
+                toolCalls.Select(toolCall => toolCall.State));
+            Assert.False(File.Exists(tempFile));
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task LocalAgentAlwaysAllowedToolSkipsApproval()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        string tempFile = Path.Combine(Path.GetTempPath(), "cccalendar-approval-" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            var handler = new QueueHttpMessageHandler(
+                [CreateWriteFileSse(tempFile, "always-allowed-marker"), CreateTextSse("ok")],
+                "text/event-stream");
+            var settings = new AiProviderSettings
+            {
+                Provider = AiProviderKind.OpenAiCompatible,
+                Endpoint = "https://api.openai.test/v1",
+                Model = "gpt-test",
+            };
+            var toolCalls = new List<AiToolCallUpdate>();
+            bool approvalInvoked = false;
+
+            await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+            {
+                Enabled = true,
+                AllowWriteFile = true,
+                AlwaysAllowTools = ["write_file"],
+            }).StreamAsync(
+                new AiAssistantRequest(
+                    "写文件",
+                    AiAssistantMode.LocalAgent,
+                    toolApproval: (_, _) =>
+                    {
+                        approvalInvoked = true;
+                        return Task.FromResult(AiToolApprovalDecision.AllowOnce);
+                    }),
+                (update, _) =>
+                {
+                    if (update is AiToolCallUpdate toolCall)
+                    {
+                        toolCalls.Add(toolCall);
+                    }
+
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None);
+
+            // 白名单命中：不弹审批（无 PendingApproval 事件、回调不触发），直接执行。
+            Assert.False(approvalInvoked);
+            Assert.Equal(
+                [AiToolCallState.Running, AiToolCallState.Ok],
+                toolCalls.Select(toolCall => toolCall.State));
+            Assert.True(File.Exists(tempFile));
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task LocalAgentToolApprovalTimeoutDeniesByDefault()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        string tempFile = Path.Combine(Path.GetTempPath(), "cccalendar-approval-" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            var handler = new QueueHttpMessageHandler(
+                [CreateWriteFileSse(tempFile, "timeout-marker"), CreateTextSse("ok")],
+                "text/event-stream");
+            var settings = new AiProviderSettings
+            {
+                Provider = AiProviderKind.OpenAiCompatible,
+                Endpoint = "https://api.openai.test/v1",
+                Model = "gpt-test",
+            };
+            var toolCalls = new List<AiToolCallUpdate>();
+
+            await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+            {
+                Enabled = true,
+                AllowWriteFile = true,
+            }).StreamAsync(
+                // 回调永不完成 + 注入短超时：等待期用户无响应，默认拒绝。
+                new AiAssistantRequest(
+                    "写文件",
+                    AiAssistantMode.LocalAgent,
+                    toolApproval: (_, _) => new TaskCompletionSource<AiToolApprovalDecision>().Task)
+                {
+                    ApprovalTimeout = TimeSpan.FromMilliseconds(100),
+                },
+                (update, _) =>
+                {
+                    if (update is AiToolCallUpdate toolCall)
+                    {
+                        toolCalls.Add(toolCall);
+                    }
+
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None);
+
+            Assert.Equal(
+                [AiToolCallState.PendingApproval, AiToolCallState.Error],
+                toolCalls.Select(toolCall => toolCall.State));
+            Assert.Equal("用户已拒绝", toolCalls[1].ResultSummary);
+            Assert.False(File.Exists(tempFile));
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task LocalAgentToolApprovalStopPropagatesCancellation()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        string tempFile = Path.Combine(Path.GetTempPath(), "cccalendar-approval-" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            var handler = new QueueHttpMessageHandler(
+                [CreateWriteFileSse(tempFile, "cancel-marker")],
+                "text/event-stream");
+            var settings = new AiProviderSettings
+            {
+                Provider = AiProviderKind.OpenAiCompatible,
+                Endpoint = "https://api.openai.test/v1",
+                Model = "gpt-test",
+            };
+            var toolCalls = new List<AiToolCallUpdate>();
+
+            // 审批等待期间用户点停止：外层令牌取消，异常原样上抛（不发 Error 事件）。
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+                {
+                    Enabled = true,
+                    AllowWriteFile = true,
+                }).StreamAsync(
+                    new AiAssistantRequest(
+                        "写文件",
+                        AiAssistantMode.LocalAgent,
+                        toolApproval: (_, _) =>
+                        {
+                            cts.Cancel();
+                            return new TaskCompletionSource<AiToolApprovalDecision>().Task;
+                        }),
+                    (update, _) =>
+                    {
+                        if (update is AiToolCallUpdate toolCall)
+                        {
+                            toolCalls.Add(toolCall);
+                        }
+
+                        return Task.CompletedTask;
+                    },
+                    cts.Token));
+
+            Assert.Equal([AiToolCallState.PendingApproval], toolCalls.Select(toolCall => toolCall.State));
+            Assert.False(File.Exists(tempFile));
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task LocalAgentSpawnSubagentFeedsAnswerBackToParent()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            [
+                CreateSpawnSubagentSse("统计待办", "统计当前待办数量"),
+                CreateTextSse("子代理答复：共 2 条"),
+                CreateTextSse("完成"),
+            ],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+        var events = new List<AiAssistantUpdate>();
+
+        await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+        {
+            Enabled = true,
+        }).StreamAsync(
+            new AiAssistantRequest("查待办", AiAssistantMode.LocalAgent),
+            (update, _) =>
+            {
+                events.Add(update);
+                return Task.CompletedTask;
+            },
+            CancellationToken.None);
+
+        // 事件流：Started → 子代理文本 → Completed(true)；spawn 不落工具行事件。
+        // P74-02 起子会话的上下文构成事件（AiContextCompositionUpdate）也会包进
+        // 子代理流，验序前先滤掉。
+        AiSubagentUpdate[] subagentEvents = [..
+            events.OfType<AiSubagentUpdate>()
+                .Where(update => update.Inner is not AiContextCompositionUpdate)];
+        Assert.IsType<AiSubagentStarted>(subagentEvents[0].Inner);
+        Assert.IsType<AiTextDelta>(subagentEvents[1].Inner);
+        AiSubagentCompleted completed = Assert.IsType<AiSubagentCompleted>(subagentEvents[^1].Inner);
+        Assert.True(completed.Succeeded);
+        Assert.Empty(events.OfType<AiToolCallUpdate>());
+        // 请求序：主会话（spawn 调用）→ 子会话（task 作为 user message）→
+        // 主会话第 2 轮（子代理答复作为工具结果回传）。
+        // 注意：body 由 JsonNode.ToJsonString() 序列化，非 ASCII 默认转义成
+        // \uXXXX（System.Text.Json 默认 encoder），断言须解析 JSON 比对解码值。
+        Assert.Equal(3, handler.Requests.Count);
+        Assert.Equal(
+            "统计当前待办数量",
+            GetLastMessageContent(handler.Requests[1].Body, "user"));
+        Assert.Equal(
+            "子代理答复：共 2 条",
+            GetLastMessageContent(handler.Requests[2].Body, "tool"));
+    }
+
+    /// <summary>取 body.messages 里最后一条指定 role 的 content（中文已被 \uXXXX 转义，须解码比对）。</summary>
+    private static string? GetLastMessageContent(string body, string role)
+    {
+        using JsonDocument document = JsonDocument.Parse(body);
+        return document.RootElement.GetProperty("messages")
+            .EnumerateArray()
+            .Last(message => message.GetProperty("role").GetString() == role)
+            .GetProperty("content")
+            .GetString();
+    }
+
+    [Fact]
+    public async Task LocalAgentSubagentDepthExcludesSpawnToolAtLimit()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new QueueHttpMessageHandler(
+            [CreateTextSse("ok"), CreateTextSse("ok")],
+            "text/event-stream");
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+
+        // 主会话（depth=0）：目录含 spawn_subagent；达上限（depth=2）：不再注入。
+        await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+        {
+            Enabled = true,
+        }).StreamAsync(
+            new AiAssistantRequest("任务", AiAssistantMode.LocalAgent),
+            (_, _) => Task.CompletedTask,
+            CancellationToken.None);
+        await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+        {
+            Enabled = true,
+        }).StreamAsync(
+            new AiAssistantRequest("任务", AiAssistantMode.LocalAgent) { SubagentDepth = 2 },
+            (_, _) => Task.CompletedTask,
+            CancellationToken.None);
+
+        Assert.Contains("\"name\":\"spawn_subagent\"", handler.Requests[0].Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"name\":\"spawn_subagent\"", handler.Requests[1].Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LocalAgentSubagentFailureEmitsCompletedAndRethrows()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        var handler = new StatusQueueHttpMessageHandler(
+            (HttpStatusCode.OK, CreateSpawnSubagentSse("失败任务", "执行失败的任务")),
+            (HttpStatusCode.InternalServerError, "{}"));
+        var settings = new AiProviderSettings
+        {
+            Provider = AiProviderKind.OpenAiCompatible,
+            Endpoint = "https://api.openai.test/v1",
+            Model = "gpt-test",
+        };
+        var events = new List<AiAssistantUpdate>();
+
+        // 子会话 HTTP 500：先发 Completed(false) 再原样上抛，主会话不继续。
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+            {
+                Enabled = true,
+            }).StreamAsync(
+                new AiAssistantRequest("任务", AiAssistantMode.LocalAgent),
+                (update, _) =>
+                {
+                    events.Add(update);
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None));
+
+        AiSubagentUpdate[] subagentEvents = [.. events.OfType<AiSubagentUpdate>()];
+        Assert.IsType<AiSubagentStarted>(subagentEvents[0].Inner);
+        AiSubagentCompleted completed = Assert.IsType<AiSubagentCompleted>(subagentEvents[^1].Inner);
+        Assert.False(completed.Succeeded);
+        Assert.False(string.IsNullOrEmpty(completed.Error));
+        Assert.Equal(2, handler.Bodies.Count);
+    }
+
+    [Fact]
+    public async Task LocalAgentSubagentForwardsApprovalInsideSubsession()
+    {
+        await using var database = await CreateDatabaseWithTodosAsync();
+        string tempFile = Path.Combine(Path.GetTempPath(), "cccalendar-subagent-" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            var handler = new QueueHttpMessageHandler(
+                [
+                    CreateSpawnSubagentSse("写报告", "把结论写进文件"),
+                    CreateWriteFileSse(tempFile, "subagent-approval-ok"),
+                    CreateTextSse("子代理完成"),
+                    CreateTextSse("最终答复"),
+                ],
+                "text/event-stream");
+            var settings = new AiProviderSettings
+            {
+                Provider = AiProviderKind.OpenAiCompatible,
+                Endpoint = "https://api.openai.test/v1",
+                Model = "gpt-test",
+            };
+            var events = new List<AiAssistantUpdate>();
+            string? approvedTool = null;
+
+            await CreateClient(database, handler, settings, getLocalAgentSettings: () => new LocalAgentSettings
+            {
+                Enabled = true,
+                AllowWriteFile = true,
+            }).StreamAsync(
+                new AiAssistantRequest(
+                    "写报告",
+                    AiAssistantMode.LocalAgent,
+                    toolApproval: (approval, _) =>
+                    {
+                        approvedTool = approval.ToolName;
+                        return Task.FromResult(AiToolApprovalDecision.AllowOnce);
+                    }),
+                (update, _) =>
+                {
+                    events.Add(update);
+                    return Task.CompletedTask;
+                },
+                CancellationToken.None);
+
+            // 审批回调被子会话透传触发；子代理内的工具事件全部带包装（同一 SubagentId）。
+            Assert.Equal("write_file", approvedTool);
+            AiToolCallUpdate[] innerToolCalls = [..
+                events.OfType<AiSubagentUpdate>()
+                    .Select(subagent => subagent.Inner)
+                    .OfType<AiToolCallUpdate>()];
+            Assert.Equal(
+                [AiToolCallState.PendingApproval, AiToolCallState.Running, AiToolCallState.Ok],
+                innerToolCalls.Select(toolCall => toolCall.State));
+            Guid subagentId = events.OfType<AiSubagentUpdate>().First().SubagentId;
+            Assert.All(events.OfType<AiSubagentUpdate>(), update => Assert.Equal(subagentId, update.SubagentId));
+            Assert.True(File.Exists(tempFile));
+            Assert.Equal(4, handler.Requests.Count);
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
+    /// <summary>构造 spawn_subagent 工具调用的 SSE 首轮响应（JsonNode 程序化）。</summary>
+    private static string CreateSpawnSubagentSse(string description, string task)
+    {
+        string arguments = JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["description"] = description,
+            ["task"] = task,
+        });
+        string firstData = new JsonObject
+        {
+            ["choices"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["delta"] = new JsonObject
+                    {
+                        ["tool_calls"] = new JsonArray
+                        {
+                            new JsonObject
+                            {
+                                ["index"] = 0,
+                                ["id"] = "call_1",
+                                ["function"] = new JsonObject
+                                {
+                                    ["name"] = "spawn_subagent",
+                                    ["arguments"] = arguments,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }.ToJsonString();
+        return $"data: {firstData}\n\ndata: [DONE]\n\n";
+    }
+
+    /// <summary>构造 write_file 工具调用的 SSE 首轮响应（JsonNode 程序化，规避内插原始字符串转义计数）。</summary>
+    private static string CreateWriteFileSse(string path, string content)
+    {
+        string arguments = JsonSerializer.Serialize(new Dictionary<string, string>
+        {
+            ["path"] = path.Replace('\\', '/'),
+            ["content"] = content,
+        });
+        string firstData = new JsonObject
+        {
+            ["choices"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["delta"] = new JsonObject
+                    {
+                        ["tool_calls"] = new JsonArray
+                        {
+                            new JsonObject
+                            {
+                                ["index"] = 0,
+                                ["id"] = "call_1",
+                                ["function"] = new JsonObject
+                                {
+                                    ["name"] = "write_file",
+                                    ["arguments"] = arguments,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }.ToJsonString();
+        return $"data: {firstData}\n\ndata: [DONE]\n\n";
+    }
+
+    /// <summary>构造纯文本回复的 SSE 响应（工具轮之后的收尾轮）。</summary>
+    private static string CreateTextSse(string text)
+    {
+        string data = new JsonObject
+        {
+            ["choices"] = new JsonArray
+            {
+                new JsonObject { ["delta"] = new JsonObject { ["content"] = text } },
+            },
+        }.ToJsonString();
+        return $"data: {data}\n\ndata: [DONE]\n\n";
+    }
+
     private sealed class StatusQueueHttpMessageHandler(
         params (HttpStatusCode Status, string Body)[] responses) : HttpMessageHandler
     {
@@ -835,14 +2139,16 @@ public sealed class ProviderAiAssistantClientTests
         TemporaryCalendarDatabase database,
         HttpMessageHandler handler,
         AiProviderSettings settings,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        Func<LocalAgentSettings>? getLocalAgentSettings = null)
     {
         return new ProviderAiAssistantClient(
             new HttpClient(handler),
             () => settings,
             new StaticSecretStore("test-secret"),
             new SqliteReadOnlyAiToolExecutor(database.DatabasePath),
-            timeProvider);
+            timeProvider,
+            getLocalAgentSettings);
     }
 
     private sealed class FrozenTimeProvider(DateTimeOffset localNow) : TimeProvider
@@ -871,6 +2177,45 @@ public sealed class ProviderAiAssistantClientTests
             },
             CancellationToken.None);
         return deltas;
+    }
+
+    private static async Task<List<AiUsageUpdate>> StreamUsageAsync(
+        ProviderAiAssistantClient client)
+    {
+        var usage = new List<AiUsageUpdate>();
+        await client.StreamAsync(
+            new AiAssistantRequest("查找发布待办", AiAssistantMode.ReadOnly),
+            (update, _) =>
+            {
+                if (update is AiUsageUpdate usageUpdate)
+                {
+                    usage.Add(usageUpdate);
+                }
+
+                return Task.CompletedTask;
+            },
+            CancellationToken.None);
+        return usage;
+    }
+
+    // P70-05：收集工具调用可见性事件（Running/Ok/Error）。
+    private static async Task<List<AiToolCallUpdate>> StreamToolCallsAsync(
+        ProviderAiAssistantClient client)
+    {
+        var toolCalls = new List<AiToolCallUpdate>();
+        await client.StreamAsync(
+            new AiAssistantRequest("查找发布待办", AiAssistantMode.ReadOnly),
+            (update, _) =>
+            {
+                if (update is AiToolCallUpdate toolCall)
+                {
+                    toolCalls.Add(toolCall);
+                }
+
+                return Task.CompletedTask;
+            },
+            CancellationToken.None);
+        return toolCalls;
     }
 
     private sealed record CapturedRequest(

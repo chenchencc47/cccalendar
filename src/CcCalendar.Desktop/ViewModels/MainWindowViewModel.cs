@@ -1,5 +1,6 @@
 using CcCalendar.Core.Calendars;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using MahApps.Metro.IconPacks;
 
 namespace CcCalendar.Desktop.ViewModels;
@@ -7,6 +8,11 @@ namespace CcCalendar.Desktop.ViewModels;
 public sealed class MainWindowViewModel : ObservableObject
 {
     private NavigationItemViewModel selectedItem;
+    // P70-06b：两处收起状态写回设置的回调（宿主接线，VM 不直接依赖设置存储）。
+    private readonly Action<bool>? mainNavCollapsedChanged;
+    private readonly Action<bool>? topSearchCollapsedChanged;
+    private bool isNavCollapsed;
+    private bool isTopSearchCollapsed;
 
     public MainWindowViewModel(
         TimeProvider timeProvider,
@@ -14,8 +20,16 @@ public sealed class MainWindowViewModel : ObservableObject
         IChineseCalendarService? chineseCalendarService = null,
         WeatherViewModel? weather = null,
         AssistantViewModel? assistant = null,
-        ToolCenterViewModel? tools = null)
+        ToolCenterViewModel? tools = null,
+        bool mainNavCollapsed = false,
+        Action<bool>? mainNavCollapsedChanged = null,
+        bool topSearchCollapsed = false,
+        Action<bool>? topSearchCollapsedChanged = null)
     {
+        this.mainNavCollapsedChanged = mainNavCollapsedChanged;
+        this.topSearchCollapsedChanged = topSearchCollapsedChanged;
+        isNavCollapsed = mainNavCollapsed;
+        isTopSearchCollapsed = topSearchCollapsed;
         NavigationItems =
         [
             new(NavigationDestination.Today, "今天", PackIconLucideKind.CalendarDays),
@@ -29,6 +43,9 @@ public sealed class MainWindowViewModel : ObservableObject
             new(NavigationDestination.Settings, "设置", PackIconLucideKind.Settings),
         ];
         selectedItem = NavigationItems[0];
+        // P70-06b：主导航 rail 化与顶部搜索栏收起的切换入口，XAML 按钮直接绑定。
+        ToggleNavCommand = new RelayCommand(() => IsNavCollapsed = !IsNavCollapsed);
+        ToggleTopSearchCommand = new RelayCommand(() => IsTopSearchCollapsed = !IsTopSearchCollapsed);
         Today = new TodayViewModel(timeProvider, chineseCalendarService, weather);
         Calendar = new CalendarViewModel(timeProvider, chineseCalendarService);
         Projects = new ProjectWorkspaceViewModel();
@@ -46,6 +63,44 @@ public sealed class MainWindowViewModel : ObservableObject
     }
 
     public IReadOnlyList<NavigationItemViewModel> NavigationItems { get; }
+
+    /// <summary>收起/展开主界面左侧导航栏（P70-06b）。</summary>
+    public IRelayCommand ToggleNavCommand { get; }
+
+    /// <summary>收起/展开主界面顶部搜索栏（P70-06b）。</summary>
+    public IRelayCommand ToggleTopSearchCommand { get; }
+
+    /// <summary>
+    /// 主界面导航栏收起状态（P70-06b）：false=展开 200px（图标+文字），true=rail 48px（仅图标）；
+    /// 切换时通过回调写回设置（mainNavCollapsed）。
+    /// </summary>
+    public bool IsNavCollapsed
+    {
+        get => isNavCollapsed;
+        set
+        {
+            if (SetProperty(ref isNavCollapsed, value))
+            {
+                mainNavCollapsedChanged?.Invoke(value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 顶部搜索栏收起状态（P70-06b）：false=搜索框可见，true=原位只留搜索图标按钮；
+    /// 切换时通过回调写回设置（topSearchCollapsed）。
+    /// </summary>
+    public bool IsTopSearchCollapsed
+    {
+        get => isTopSearchCollapsed;
+        set
+        {
+            if (SetProperty(ref isTopSearchCollapsed, value))
+            {
+                topSearchCollapsedChanged?.Invoke(value);
+            }
+        }
+    }
 
     public TodayViewModel Today { get; }
 

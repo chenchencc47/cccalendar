@@ -53,7 +53,8 @@ public sealed class JsonAppSettingsStoreTests : IDisposable
                 Provider = AiProviderKind.OpenAiResponses,
                 Endpoint = "https://example.test/v1",
                 Model = "gpt-work",
-            });
+            },
+            ContextWindowTokens: 131072);
         var expected = new AppSettings
         {
             AiProvider = model.Settings,
@@ -70,6 +71,37 @@ public sealed class JsonAppSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadLegacyModelWithoutContextWindowKeepsItUnset()
+    {
+        // P74-01：旧版 settings.json 的 aiModels 条目没有 contextWindowTokens 字段，
+        // 反序列化必须得到 null 而不是 0（0 会被当成已配置的窗口大小）。
+        string settingsPath = Path.Combine(testDirectory, "settings.json");
+        Directory.CreateDirectory(testDirectory);
+        await File.WriteAllTextAsync(
+            settingsPath,
+            """
+            {
+              "schemaVersion": 1,
+              "aiModels": [
+                {
+                  "id": "legacy",
+                  "displayName": "旧配置",
+                  "settings": { "provider": 0, "endpoint": "https://example.test/v1", "model": "old-model" }
+                }
+              ],
+              "selectedAiModelId": "legacy"
+            }
+            """,
+            CancellationToken.None);
+        var store = new JsonAppSettingsStore(settingsPath);
+
+        AppSettings settings = await store.LoadAsync(CancellationToken.None);
+
+        AiModelConfiguration model = Assert.Single(settings.AiModels);
+        Assert.Null(model.ContextWindowTokens);
+    }
+
+    [Fact]
     public async Task SaveThenLoadReturnsSavedSettings()
     {
         var store = CreateStore();
@@ -81,6 +113,11 @@ public sealed class JsonAppSettingsStoreTests : IDisposable
             ShowDesktopCalendar = true,
             ShowDesktopAgenda = true,
             ShowDesktopTodo = false,
+            // P70-06a：助理页会话栏收起状态（assistantSessionsCollapsed）随设置往返。
+            AssistantSessionsCollapsed = true,
+            // P70-06b：主界面导航栏/顶部搜索栏收起状态随设置往返。
+            MainNavCollapsed = true,
+            TopSearchCollapsed = true,
             DesktopCalendar = new DesktopCalendarLayoutSettings
             {
                 Mode = DesktopCalendarMode.Week,
@@ -166,6 +203,16 @@ public sealed class JsonAppSettingsStoreTests : IDisposable
                 SedentaryIntervalMinutes = 45,
                 ActiveStart = new TimeOnly(9, 0),
                 ActiveEnd = new TimeOnly(18, 0),
+            },
+            LocalAgent = new LocalAgentSettings
+            {
+                Enabled = true,
+                AllowReadFile = true,
+                AllowListDirectory = false,
+                AllowSearchFiles = true,
+                AllowWriteFile = true,
+                AllowRunCommand = false,
+                AlwaysAllowTools = ["write_file"],
             },
         };
 

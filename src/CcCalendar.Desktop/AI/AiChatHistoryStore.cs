@@ -199,6 +199,25 @@ public sealed class AssistantChatSession : INotifyPropertyChanged
 
     public DateTimeOffset CreatedAtUtc { get; }
 
+    /// <summary>
+    /// 条目相对时间文本（P70-06a 会话栏，如「2 小时前」）：由 AssistantViewModel
+    /// 依据最后活跃时间计算后写入；空会话为空串。持久化不含此字段。
+    /// </summary>
+    public string RelativeTimeText
+    {
+        get => relativeTimeText;
+        set
+        {
+            if (relativeTimeText != value)
+            {
+                relativeTimeText = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RelativeTimeText)));
+            }
+        }
+    }
+
+    private string relativeTimeText = string.Empty;
+
     public string Title
     {
         get => title;

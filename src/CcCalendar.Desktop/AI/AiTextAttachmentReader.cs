@@ -7,10 +7,17 @@ public static class AiTextAttachmentReader
 {
     public const int MaximumFileCount = 5;
     public const long MaximumFileBytes = 1024 * 1024;
-    public const long MaximumTotalBytes = 2 * 1024 * 1024;
+    // P74-04：图片附件走视觉桥转写（不注入正文），单文件放宽到 4MB、
+    // 总量放宽到 8MB；文本类仍按 1MB/2MB 旧限。
+    public const long MaximumImageFileBytes = 4 * 1024 * 1024;
+    public const long MaximumTotalBytes = 8 * 1024 * 1024;
 
     private static readonly HashSet<string> SupportedExtensions = new(
-        [".txt", ".md", ".csv", ".json", ".ics"],
+        [".txt", ".md", ".csv", ".json", ".ics", ".png", ".jpg", ".jpeg", ".webp", ".gif"],
+        StringComparer.OrdinalIgnoreCase);
+
+    private static readonly HashSet<string> ImageExtensions = new(
+        [".png", ".jpg", ".jpeg", ".webp", ".gif"],
         StringComparer.OrdinalIgnoreCase);
 
     public static async Task<IReadOnlyList<AiTextAttachment>> ReadAsync(
@@ -42,15 +49,25 @@ public static class AiTextAttachmentReader
                 throw new FileNotFoundException("找不到附件文件。", fullPath);
             }
 
-            if (file.Length > MaximumFileBytes)
+            bool isImage = ImageExtensions.Contains(file.Extension);
+            if (file.Length > (isImage ? MaximumImageFileBytes : MaximumFileBytes))
             {
-                throw new InvalidDataException($"单个附件不能超过 {MaximumFileBytes / 1024 / 1024} MB。");
+                throw new InvalidDataException(
+                    $"单个{(isImage ? "图片" : "文本")}附件不能超过 {(isImage ? MaximumImageFileBytes : MaximumFileBytes) / 1024 / 1024} MB。");
             }
 
             totalBytes += file.Length;
             if (totalBytes > MaximumTotalBytes)
             {
                 throw new InvalidDataException($"附件合计不能超过 {MaximumTotalBytes / 1024 / 1024} MB。");
+            }
+
+            // P74-04：图片不解码文本——Content 留空，发送时由视觉桥转写注入；
+            // base64 编码在转写器内按需进行，附件区不双份占内存。
+            if (isImage)
+            {
+                attachments.Add(new AiTextAttachment(file.Name, fullPath, file.Length, string.Empty, IsImage: true));
+                continue;
             }
 
             using var reader = new StreamReader(
@@ -69,4 +86,5 @@ public sealed record AiTextAttachment(
     string FileName,
     string FilePath,
     long SizeBytes,
-    string Content);
+    string Content,
+    bool IsImage = false);

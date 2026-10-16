@@ -42,6 +42,8 @@
     <SolidColorBrush x:Key="OverlayScrimBrush" Color="#66000000" />
     <SolidColorBrush x:Key="ElevationPanelBrush" Color="#22252A" />
     <SolidColorBrush x:Key="ElevationProminentBrush" Color="#2A2E34" />
+    <!-- 用户消息气泡底色（P70-01）：harness 深色 dsw-specific-bubble（neutral-bluish-850）。 -->
+    <SolidColorBrush x:Key="BubbleBrush" Color="#2C2C2E" />
 
     <!-- 交互叠加色（P61-01）：深色下用白色叠加，alpha 与浅色对齐。 -->
     <SolidColorBrush x:Key="InteractionHoverBrush" Color="#14FFFFFF" />
